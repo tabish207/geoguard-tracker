@@ -17,34 +17,14 @@
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
-        
-        /* Layout fix: Prevent map from collapsing to 0px height on deployment */
-        #map-container {
-            position: relative;
-            width: 100%;
-            height: 60vh; /* Mobile height */
-        }
-        @media (min-width: 768px) {
-            #map-container { height: 100vh !important; }
-        }
-        #map { 
-            position: absolute !important;
-            top: 0; bottom: 0; left: 0; right: 0;
-            width: 100% !important;
-            height: 100% !important;
-            background: #cbd5e1 !important; 
-        }
-        
+        #map { background: #cbd5e1 !important; }
         .leaflet-draw-toolbar a { background-color: #ffffff !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
         .leaflet-draw-actions a { background-color: #334155 !important; color: #ffffff !important; }
-        
-        .custom-popup .leaflet-popup-content-wrapper {
-            background: #1e293b; color: #f8fafc; border-radius: 12px; padding: 4px;
-        }
+        .custom-popup .leaflet-popup-content-wrapper { background: #1e293b; color: #f8fafc; border-radius: 12px; padding: 4px; }
         .custom-popup .leaflet-popup-tip { background: #1e293b; }
     </style>
 </head>
-<body class="bg-[#f1f5f9] text-[#0f172a] min-h-screen flex flex-col antialiased">
+<body class="bg-[#f1f5f9] text-[#0f172a] min-h-screen flex flex-col antialiased m-0 p-0">
 
     <div id="emergency-banner" class="hidden bg-gradient-to-r from-red-600 to-rose-700 text-white text-center py-3 font-bold text-sm tracking-wide uppercase shadow-lg sticky top-0 z-[9999] border-b border-red-700">
         <span class="inline-flex items-center gap-2">
@@ -54,15 +34,48 @@
         <button id="dismiss-emergency" class="ml-6 bg-white text-red-700 px-4 py-1 rounded-md text-xs font-bold shadow hover:bg-slate-100 transition-all">Clear Threat State</button>
     </div>
 
-  <main id="tracking-panel" class="hidden fixed inset-0 w-screen h-screen m-0 p-0 overflow-hidden flex flex-col md:flex-row bg-slate-900">
-        
+    <main id="setup-panel" class="p-6 flex-1 flex flex-col justify-center max-w-md mx-auto w-full gap-6 my-auto">
+        <div class="text-center space-y-1">
+            <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">GEOGUARD LIVE</h1>
+            <p class="text-sm text-slate-500 font-medium">Precision Management Interface & Telemetry Hub</p>
+        </div>
+
+        <div class="bg-white border border-slate-200 p-6 rounded-2xl shadow-xl space-y-5">
+            <div class="space-y-1.5">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Operator Designation</label>
+                <input type="text" id="username" placeholder="Type name or callsign..." class="w-full bg-slate-50 border border-slate-300 p-3 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium transition-all">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <button id="btn-create-mode" class="p-4 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 font-semibold text-sm transition-all">Initiate Group</button>
+                <button id="btn-join-mode" class="p-4 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 font-semibold text-sm transition-all">Join Session</button>
+            </div>
+
+            <div id="create-group-box" class="hidden space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <input type="text" id="group-name" placeholder="Deployment Area (e.g., Swat Valley)" class="w-full bg-white border border-slate-300 p-2.5 rounded-lg text-sm text-slate-900">
+                <button id="btn-submit-create" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-md transition-all">Generate Control Domain</button>
+            </div>
+
+            <div id="join-group-box" class="hidden space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <input type="text" id="target-group-id" placeholder="Paste Session Security Key..." class="w-full bg-white border border-slate-300 p-2.5 rounded-lg text-sm font-mono text-slate-900">
+                <button id="btn-submit-join" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-md transition-all">Connect Stream</button>
+            </div>
+            
+            <button id="btn-hard-reset" class="w-full text-center text-xs text-red-500 hover:underline mt-2">Clear App Session Data</button>
+        </div>
+    </main>
+
+    <main id="tracking-panel" class="hidden fixed inset-0 w-screen h-screen m-0 p-0 overflow-hidden flex flex-col md:flex-row bg-slate-900">
         <aside class="w-full md:w-80 bg-slate-900 text-slate-100 flex flex-col h-[40vh] md:h-full shadow-2xl z-20 flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-800">
-            <div class="p-4 border-b border-slate-800 bg-slate-950/40">
-                <h2 class="font-bold text-base text-white tracking-wide line-clamp-1" id="display-group-name">Active Session</h2>
-                <div class="mt-2 bg-slate-900 border border-slate-800 rounded-md p-2 flex items-center justify-between">
-                    <span class="text-[10px] font-mono text-slate-500 font-bold uppercase">Key:</span>
-                    <span class="text-xs font-mono text-blue-400 font-medium select-all cursor-pointer" id="display-group-id">---</span>
+            <div class="p-4 border-b border-slate-800 bg-slate-950/40 flex justify-between items-center">
+                <div>
+                    <h2 class="font-bold text-base text-white tracking-wide line-clamp-1" id="display-group-name">Active Session</h2>
+                    <div class="mt-2 bg-slate-900 border border-slate-800 rounded-md p-2 flex items-center justify-between gap-2">
+                        <span class="text-[10px] font-mono text-slate-500 font-bold uppercase">Key:</span>
+                        <span class="text-xs font-mono text-blue-400 font-medium select-all cursor-pointer" id="display-group-id">---</span>
+                    </div>
                 </div>
+                <button id="btn-logout" class="text-xs bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded border border-slate-700">Exit</button>
             </div>
 
             <div class="grid grid-cols-3 gap-1.5 p-3 bg-slate-950/20 border-b border-slate-800 text-center">
@@ -100,54 +113,20 @@
         </section>
     </main>
 
-    <main id="tracking-panel" class="hidden flex-1 flex flex-col md:flex-row min-h-screen md:h-screen max-h-screen overflow-hidden">
-        
-      <aside class="w-full md:w-80 bg-slate-900 text-slate-100 flex flex-col h-[40vh] md:h-screen shadow-2xl z-20 flex-shrink-0 border-b border-slate-800 md:border-b-0 md:border-r">            <div class="p-4 border-b border-slate-800 bg-slate-950/40">
-                <h2 class="font-bold text-base text-white tracking-wide line-clamp-1" id="display-group-name">Active Session</h2>
-                <div class="mt-2 bg-slate-900 border border-slate-800 rounded-md p-2 flex items-center justify-between">
-                    <span class="text-[10px] font-mono text-slate-500 font-bold uppercase">Key:</span>
-                    <span class="text-xs font-mono text-blue-400 font-medium select-all cursor-pointer" id="display-group-id">---</span>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-3 gap-1.5 p-3 bg-slate-950/20 border-b border-slate-800 text-center">
-                <div class="bg-slate-800/60 p-2 rounded-xl border border-slate-800">
-                    <p class="text-[10px] text-slate-400 font-semibold uppercase">Total</p>
-                    <p class="text-lg font-bold font-mono text-white mt-0.5" id="cnt-total">0</p>
-                </div>
-                <div class="bg-amber-500/10 p-2 rounded-xl border border-amber-500/20">
-                    <p class="text-[10px] text-amber-400 font-semibold uppercase">Breach</p>
-                    <p class="text-lg font-bold font-mono text-amber-400 mt-0.5" id="cnt-breach">0</p>
-                </div>
-                <div class="bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">
-                    <p class="text-[10px] text-rose-400 font-semibold uppercase">SOS</p>
-                    <p class="text-lg font-bold font-mono text-rose-400 mt-0.5" id="cnt-alert">0</p>
-                </div>
-            </div>
-
-            <div class="flex-1 overflow-y-auto p-3 space-y-2">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 px-1">Operator Grid Diagnostics</p>
-                <ul id="member-list" class="space-y-1.5"></ul>
-            </div>
-
-            <div class="p-3 border-t border-slate-800 bg-slate-950/30 flex flex-col gap-2">
-                <button id="btn-ble-connect" class="w-full bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-lg font-bold text-xs tracking-wide transition-all border border-slate-700 uppercase">
-                    Connect Hardware Component
-                </button>
-                <button id="btn-panic" class="w-full bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-bold text-xs tracking-wider shadow-md transition-all uppercase">
-                    Trigger Local SOS Panic
-                </button>
-            </div>
-        </aside>
-
-        <section id="map-container" class="flex-1">
-            <div id="map"></div>
-        </section>
-    </main>
-
     <audio id="siren-audio" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" loop></audio>
 
-   <script type="module">
+    <script type="module">
+        // 🚨 EMERGENCY PURGE: Instantly wipe any old corrupted service workers hanging around
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (let registration of registrations) {
+                    if(!registration.active?.scriptURL.includes('geoguard-cache-v6')) {
+                        registration.unregister();
+                    }
+                }
+            });
+        }
+
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
@@ -165,11 +144,10 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // 🔄 PERSISTENCE ENGINE: Recover existing session settings from device flash storage
         let currentGroupId = localStorage.getItem('geo_group_id') || null;
         let currentUserId = localStorage.getItem('geo_user_id') || ('user_' + Math.random().toString(36).substring(2, 9));
         let currentUsername = localStorage.getItem('geo_username') || "";
-        localStorage.setItem('geo_user_id', currentUserId); // Lock in unique device tracking ID
+        localStorage.setItem('geo_user_id', currentUserId);
 
         let map = null;
         let wakeLock = null;
@@ -187,28 +165,30 @@
         const emergencyMsg = document.getElementById('emergency-msg');
         const siren = document.getElementById('siren-audio');
 
-        // Service Worker Verification Channel
         if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js', { scope: './' })
                 .then(reg => {
-                    console.log('Production Background Engine Synced');
-                    // Share active configurations with the background execution tier
                     if(currentGroupId) syncSessionWithWorker();
-                })
-                .catch(err => console.error(err));
+                }).catch(err => console.error(err));
             });
             Notification.requestPermission();
         }
 
-        // Auto-Login Sequence Check
-        if (currentGroupId && currentUsername) {
-            setupPanel.classList.add('hidden');
-            trackingPanel.classList.remove('hidden');
-            requestScreenWakeLock();
-            initiateMappingSystem();
-            startLiveGeolocationTracking();
-            listenToGroupRealtimeChanges();
+        // 🛡️ SAFE AUTO-LOGIN BOOT: Wrapped in a try/catch block to eliminate white-screen deadlocks
+        try {
+            if (currentGroupId && currentUsername) {
+                setupPanel.classList.add('hidden');
+                trackingPanel.classList.remove('hidden');
+                requestScreenWakeLock();
+                initiateMappingSystem();
+                startLiveGeolocationTracking();
+                listenToGroupRealtimeChanges();
+            }
+        } catch (e) {
+            console.error("Auto-login failed, falling back safely to login panels.", e);
+            localStorage.clear();
+            setupPanel.classList.remove('hidden');
         }
 
         async function requestScreenWakeLock() {
@@ -273,55 +253,60 @@
         }
 
         function initiateMappingSystem() {
-            if (map !== null) { map.remove(); }
+            try {
+                if (map !== null) { map.remove(); }
 
-            map = L.map('map', { zoomControl: false, trackResize: true }).setView([30.3753, 69.3451], 5);
-            L.control.zoom({ position: 'topright' }).addTo(map);
+                map = L.map('map', { zoomControl: false, trackResize: true }).setView([30.3753, 69.3451], 5);
+                L.control.zoom({ position: 'topright' }).addTo(map);
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors',
-                maxZoom: 19,
-                crossOrigin: true
-            }).addTo(map);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19,
+                    crossOrigin: true
+                }).addTo(map);
 
-            const drawnItems = new L.FeatureGroup();
-            map.addLayer(drawnItems);
+                const drawnItems = new L.FeatureGroup();
+                map.addLayer(drawnItems);
 
-            const drawControl = new L.Control.Draw({
-                position: 'topleft',
-                draw: {
-                    polygon: { allowIntersection: false, showArea: true, shapeOptions: { color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 3 } },
-                    polyline: false, circle: false, rectangle: false, marker: false, circlemarker: false
-                },
-                edit: { featureGroup: drawnItems, remove: true }
-            });
-            map.addControl(drawControl);
+                const drawControl = new L.Control.Draw({
+                    position: 'topleft',
+                    draw: {
+                        polygon: { allowIntersection: false, showArea: true, shapeOptions: { color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 3 } },
+                        polyline: false, circle: false, rectangle: false, marker: false, circlemarker: false
+                    },
+                    edit: { featureGroup: drawnItems, remove: true }
+                });
+                map.addControl(drawControl);
 
-            map.on(L.Draw.Event.CREATED, function (e) {
-                if (activeGeofencePolygon) { drawnItems.removeLayer(activeGeofencePolygon); }
-                activeGeofencePolygon = e.layer;
-                activeGeofencePolygon.setStyle({ color: '#ea580c', fillColor: '#f97316', fillOpacity: 0.15, weight: 3 });
-                drawnItems.addLayer(activeGeofencePolygon);
-            });
+                map.on(L.Draw.Event.CREATED, function (e) {
+                    if (activeGeofencePolygon) { drawnItems.removeLayer(activeGeofencePolygon); }
+                    activeGeofencePolygon = e.layer;
+                    activeGeofencePolygon.setStyle({ color: '#ea580c', fillColor: '#f97316', fillOpacity: 0.15, weight: 3 });
+                    drawnItems.addLayer(activeGeofencePolygon);
+                });
 
-            map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
+                map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
 
-            map.invalidateSize();
-            setTimeout(() => { map.invalidateSize(); }, 300);
-            setTimeout(() => { map.invalidateSize(); }, 800);
+                map.invalidateSize();
+                setTimeout(() => { map.invalidateSize(); }, 300);
+            } catch (err) {
+                console.error("Leaflet initialization caught an error:", err);
+            }
         }
 
         function isPointInPolygon(lat, lng, polygon) {
-            if (!polygon) return true;
-            const latlngs = polygon.getLatLngs()[0];
-            let inside = false;
-            for (let i = 0, j = latlngs.length - 1; i < latlngs.length; j = i++) {
-                const xi = latlngs[i].lat, yi = latlngs[i].lng;
-                const xj = latlngs[j].lat, yj = latlngs[j].lng;
-                const intersect = ((yi > lng) !== (yj > lng)) && (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
-                if (intersect) inside = !inside;
-            }
-            return inside;
+            if (!polygon || !polygon.getLatLngs) return true;
+            try {
+                const latlngs = polygon.getLatLngs()[0];
+                let inside = false;
+                for (let i = 0, j = latlngs.length - 1; i < latlngs.length; j = i++) {
+                    const xi = latlngs[i].lat, yi = latlngs[i].lng;
+                    const xj = latlngs[j].lat, yj = latlngs[j].lng;
+                    const intersect = ((yi > lng) !== (yj > lng)) && (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+                    if (intersect) inside = !inside;
+                }
+                return inside;
+            } catch(e) { return true; }
         }
 
         function startLiveGeolocationTracking() {
@@ -330,39 +315,41 @@
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     
-                    set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lat`), lat);
-                    set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lng`), lng);
-                    
-                    const historyRef = ref(db, `groups/${currentGroupId}/members/${currentUserId}/history`);
-                    push(historyRef, { lat: lat, lng: lng, timestamp: Date.now() });
+                    if(currentGroupId) {
+                        set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lat`), lat);
+                        set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lng`), lng);
+                        
+                        const historyRef = ref(db, `groups/${currentGroupId}/members/${currentUserId}/history`);
+                        push(historyRef, { lat: lat, lng: lng, timestamp: Date.now() });
+                    }
                 }, (error) => console.error(error), { enableHighAccuracy: true });
             }
         }
 
         function listenToGroupRealtimeChanges() {
             onValue(ref(db, `groups/${currentGroupId}/groupName`), (snapshot) => {
-                document.getElementById('display-group-name').innerText = snapshot.val();
+                const nameNode = document.getElementById('display-group-name');
+                if(nameNode) nameNode.innerText = snapshot.val() || "Active Session";
                 document.getElementById('display-group-id').innerText = currentGroupId;
             });
 
             onValue(ref(db, `groups/${currentGroupId}/members`), (snapshot) => {
                 const members = snapshot.val() || {};
                 const rosterList = document.getElementById('member-list');
+                if(!rosterList) return;
                 rosterList.innerHTML = ""; 
 
                 let groupAlertTriggered = false;
                 let compositeAlertMsg = "";
-                
                 let activeNodes = 0;
                 let totalBreaches = 0;
                 let totalAlerts = 0;
 
                 Object.keys(members).forEach(userId => {
                     const data = members[userId];
-                    if(data.lat === 0 && data.lng === 0) return;
+                    if(!data || (data.lat === 0 && data.lng === 0)) return;
 
                     activeNodes++;
-
                     const isInsideSafeZone = isPointInPolygon(data.lat, data.lng, activeGeofencePolygon);
                     const hasBreachedGeofence = !isInsideSafeZone;
 
@@ -375,13 +362,13 @@
                     }
 
                     const li = document.createElement('li');
-                    li.className = `p-3 rounded-xl border flex flex-col gap-1 text-xs transition-all ${
+                    li.className = `p-3 rounded-xl border flex flex-col gap-1 text-xs ${
                         data.isEmergency ? 'bg-red-500 text-white border-red-600 font-bold' : hasBreachedGeofence ? 'bg-amber-500 text-slate-900 border-amber-600 font-semibold' : 'bg-slate-800 text-slate-100 border-slate-700'
                     }`;
                     
                     li.innerHTML = `
                         <div class="flex items-center justify-between">
-                            <span>${data.name} ${userId === currentUserId ? '(You)' : ''}</span>
+                            <span>${data.name || 'Unknown'} ${userId === currentUserId ? '(You)' : ''}</span>
                             <span class="text-[9px] font-mono tracking-widest px-1.5 py-0.5 rounded uppercase bg-black/20">${
                                 data.isEmergency ? 'SOS' : hasBreachedGeofence ? 'BREACH' : 'OK'
                             }</span>
@@ -396,15 +383,17 @@
                         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
                     });
 
-                    if (mapMarkers[userId]) {
-                        mapMarkers[userId].setLatLng([data.lat, data.lng]);
-                        mapMarkers[userId].setIcon(targetIcon);
-                    } else {
-                        mapMarkers[userId] = L.marker([data.lat, data.lng], { icon: targetIcon }).addTo(map);
+                    if (map && mapMarkers) {
+                        if (mapMarkers[userId]) {
+                            mapMarkers[userId].setLatLng([data.lat, data.lng]);
+                            mapMarkers[userId].setIcon(targetIcon);
+                        } else {
+                            mapMarkers[userId] = L.marker([data.lat, data.lng], { icon: targetIcon }).addTo(map);
+                        }
+                        mapMarkers[userId].bindPopup(`<div class="text-slate-900 font-sans text-xs"><b>User:</b> ${data.name}<br><b>Status:</b> ${data.isEmergency ? '🚨 SOS' : hasBreachedGeofence ? '⚠️ BREACHED' : '🟢 SAFE'}</div>`, { className: 'custom-popup' });
                     }
-                    mapMarkers[userId].bindPopup(`<div class="text-slate-900 font-sans text-xs"><b>User:</b> ${data.name}<br><b>Status:</b> ${data.isEmergency ? '🚨 SOS' : hasBreachedGeofence ? '⚠️ BREACHED' : '🟢 SAFE'}</div>`, { className: 'custom-popup' });
 
-                    if (data.history) {
+                    if (data.history && map) {
                         const trailPoints = Object.keys(data.history).map(key => [data.history[key].lat, data.history[key].lng]);
                         if (mapPolylines[userId]) {
                             mapPolylines[userId].setLatLngs(trailPoints);
@@ -431,6 +420,14 @@
             });
         }
 
+        // Logout and Reset Engine Hooks
+        const handleLogoutAndClear = () => {
+            localStorage.clear();
+            window.location.reload();
+        };
+        document.getElementById('btn-logout').addEventListener('click', handleLogoutAndClear);
+        document.getElementById('btn-hard-reset').addEventListener('click', handleLogoutAndClear);
+
         document.getElementById('btn-ble-connect').addEventListener('click', async () => {
             try {
                 const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'GeoGuard_Button' }], optionalServices: [BLE_SERVICE_UUID] });
@@ -446,9 +443,11 @@
         });
 
         document.getElementById('btn-panic').addEventListener('click', () => {
-            set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), true);
+            if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), true);
         });
         document.getElementById('dismiss-emergency').addEventListener('click', () => {
-            set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), false);
+            if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), false);
         });
     </script>
+</body>
+</html>
