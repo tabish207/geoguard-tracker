@@ -115,16 +115,22 @@
 
     <audio id="siren-audio" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" loop></audio>
 
-    <script type="module">
-        // 🚨 EMERGENCY PURGE: Instantly wipe any old corrupted service workers hanging around
+  <script type="module">
+        // 🚨 FIXED: Safe, crash-proof service worker purging logic
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(registrations => {
                 for (let registration of registrations) {
-                    if(!registration.active?.scriptURL.includes('geoguard-cache-v6')) {
-                        registration.unregister();
+                    const activeWorker = registration.active || registration.waiting || registration.installing;
+                    const scriptUrl = activeWorker ? activeWorker.scriptURL : '';
+                    
+                    // Only unregister if it's genuinely an outdated build
+                    if (scriptUrl && !scriptUrl.includes('geoguard-cache-v6')) {
+                        registration.unregister().then(() => {
+                            console.log('Purged legacy service worker engine smoothly.');
+                        });
                     }
                 }
-            });
+            }).catch(err => console.log('Service worker cleanup bypassed:', err));
         }
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -141,8 +147,14 @@
             measurementId: "G-MGGR7MJBEC"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+        // Initialize Firebase safely
+        let app, db;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+        } catch (e) {
+            console.error("Firebase core failed to boot:", e);
+        }
 
         let currentGroupId = localStorage.getItem('geo_group_id') || null;
         let currentUserId = localStorage.getItem('geo_user_id') || ('user_' + Math.random().toString(36).substring(2, 9));
@@ -170,25 +182,27 @@
                 navigator.serviceWorker.register('./service-worker.js', { scope: './' })
                 .then(reg => {
                     if(currentGroupId) syncSessionWithWorker();
-                }).catch(err => console.error(err));
+                }).catch(err => console.error("SW Register Error:", err));
             });
-            Notification.requestPermission();
+            if (Notification.permission !== 'granted') {
+                Notification.requestPermission();
+            }
         }
 
-        // 🛡️ SAFE AUTO-LOGIN BOOT: Wrapped in a try/catch block to eliminate white-screen deadlocks
+        // 🛡️ SAFE BOOT SEQUENCE
         try {
-            if (currentGroupId && currentUsername) {
-                setupPanel.classList.add('hidden');
-                trackingPanel.classList.remove('hidden');
+            if (currentGroupId && currentUsername && db) {
+                if (setupPanel) setupPanel.classList.add('hidden');
+                if (trackingPanel) trackingPanel.classList.remove('hidden');
                 requestScreenWakeLock();
                 initiateMappingSystem();
                 startLiveGeolocationTracking();
                 listenToGroupRealtimeChanges();
             }
         } catch (e) {
-            console.error("Auto-login failed, falling back safely to login panels.", e);
+            console.error("Auto-login error protection fallback triggered:", e);
             localStorage.clear();
-            setupPanel.classList.remove('hidden');
+            if (setupPanel) setupPanel.classList.remove('hidden');
         }
 
         async function requestScreenWakeLock() {
@@ -206,44 +220,53 @@
             }
         }
 
-        document.getElementById('btn-create-mode').addEventListener('click', () => {
-            document.getElementById('create-group-box').classList.toggle('hidden');
-            document.getElementById('join-group-box').classList.add('hidden');
-        });
-        document.getElementById('btn-join-mode').addEventListener('click', () => {
-            document.getElementById('join-group-box').classList.toggle('hidden');
-            document.getElementById('create-group-box').classList.add('hidden');
-        });
+        if (document.getElementById('btn-create-mode')) {
+            document.getElementById('btn-create-mode').addEventListener('click', () => {
+                document.getElementById('create-group-box').classList.toggle('hidden');
+                document.getElementById('join-group-box').classList.add('hidden');
+            });
+        }
+        if (document.getElementById('btn-join-mode')) {
+            document.getElementById('btn-join-mode').addEventListener('click', () => {
+                document.getElementById('join-group-box').classList.toggle('hidden');
+                document.getElementById('create-group-box').classList.add('hidden');
+            });
+        }
 
-        document.getElementById('btn-submit-create').addEventListener('click', () => {
-            currentUsername = usernameInput.value.trim();
-            const groupName = document.getElementById('group-name').value.trim();
-            if(!currentUsername || !groupName) return alert("Verify core fields.");
+        if (document.getElementById('btn-submit-create')) {
+            document.getElementById('btn-submit-create').addEventListener('click', () => {
+                currentUsername = usernameInput.value.trim();
+                const groupName = document.getElementById('group-name').value.trim();
+                if(!currentUsername || !groupName || !db) return alert("Verify core fields.");
 
-            const groupsRef = ref(db, 'groups');
-            const newGroupRef = push(groupsRef);
-            currentGroupId = newGroupRef.key;
+                const groupsRef = ref(db, 'groups');
+                const newGroupRef = push(groupsRef);
+                currentGroupId = newGroupRef.key;
 
-            set(newGroupRef, { groupName: groupName, createdAt: Date.now(), guideId: currentUserId }).then(() => {
+                set(newGroupRef, { groupName: groupName, createdAt: Date.now(), guideId: currentUserId }).then(() => {
+                    commitSessionToStorage(currentGroupId, currentUsername);
+                });
+            });
+        }
+
+        if (document.getElementById('btn-submit-join')) {
+            document.getElementById('btn-submit-join').addEventListener('click', () => {
+                currentUsername = usernameInput.value.trim();
+                currentGroupId = document.getElementById('target-group-id').value.trim();
+                if(!currentUsername || !currentGroupId) return alert("Verify submission fields.");
                 commitSessionToStorage(currentGroupId, currentUsername);
             });
-        });
-
-        document.getElementById('btn-submit-join').addEventListener('click', () => {
-            currentUsername = usernameInput.value.trim();
-            currentGroupId = document.getElementById('target-group-id').value.trim();
-            if(!currentUsername || !currentGroupId) return alert("Verify submission fields.");
-            commitSessionToStorage(currentGroupId, currentUsername);
-        });
+        }
 
         function commitSessionToStorage(groupId, name) {
             localStorage.setItem('geo_group_id', groupId);
             localStorage.setItem('geo_username', name);
             
+            if (!db) return;
             const memberRef = ref(db, `groups/${groupId}/members/${currentUserId}`);
             set(memberRef, { name: name, lat: 0.0, lng: 0.0, isEmergency: false }).then(() => {
-                setupPanel.classList.add('hidden');
-                trackingPanel.classList.remove('hidden');
+                if (setupPanel) setupPanel.classList.add('hidden');
+                if (trackingPanel) trackingPanel.classList.remove('hidden');
                 requestScreenWakeLock(); 
                 initiateMappingSystem();
                 startLiveGeolocationTracking();
@@ -254,7 +277,10 @@
 
         function initiateMappingSystem() {
             try {
-                if (map !== null) { map.remove(); }
+                if (map !== null) { map.remove(); map = null; }
+
+                const mapEl = document.getElementById('map');
+                if (!mapEl) return;
 
                 map = L.map('map', { zoomControl: false, trackResize: true }).setView([30.3753, 69.3451], 5);
                 L.control.zoom({ position: 'topright' }).addTo(map);
@@ -288,9 +314,9 @@
                 map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
 
                 map.invalidateSize();
-                setTimeout(() => { map.invalidateSize(); }, 300);
+                setTimeout(() => { if (map) map.invalidateSize(); }, 400);
             } catch (err) {
-                console.error("Leaflet initialization caught an error:", err);
+                console.error("Leaflet core map startup caught an error:", err);
             }
         }
 
@@ -315,7 +341,7 @@
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     
-                    if(currentGroupId) {
+                    if(currentGroupId && db) {
                         set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lat`), lat);
                         set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lng`), lng);
                         
@@ -327,10 +353,13 @@
         }
 
         function listenToGroupRealtimeChanges() {
+            if (!db || !currentGroupId) return;
+
             onValue(ref(db, `groups/${currentGroupId}/groupName`), (snapshot) => {
                 const nameNode = document.getElementById('display-group-name');
                 if(nameNode) nameNode.innerText = snapshot.val() || "Active Session";
-                document.getElementById('display-group-id').innerText = currentGroupId;
+                const idNode = document.getElementById('display-group-id');
+                if(idNode) idNode.innerText = currentGroupId;
             });
 
             onValue(ref(db, `groups/${currentGroupId}/members`), (snapshot) => {
@@ -358,7 +387,7 @@
 
                     if (data.isEmergency || hasBreachedGeofence) {
                         groupAlertTriggered = true;
-                        compositeAlertMsg = data.name.toUpperCase() + (data.isEmergency ? " [SOS]" : " [BREACH]");
+                        compositeAlertMsg = (data.name || 'Operator').toUpperCase() + (data.isEmergency ? " [SOS]" : " [BREACH]");
                     }
 
                     const li = document.createElement('li');
@@ -383,14 +412,14 @@
                         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
                     });
 
-                    if (map && mapMarkers) {
+                    if (map) {
                         if (mapMarkers[userId]) {
                             mapMarkers[userId].setLatLng([data.lat, data.lng]);
                             mapMarkers[userId].setIcon(targetIcon);
                         } else {
                             mapMarkers[userId] = L.marker([data.lat, data.lng], { icon: targetIcon }).addTo(map);
                         }
-                        mapMarkers[userId].bindPopup(`<div class="text-slate-900 font-sans text-xs"><b>User:</b> ${data.name}<br><b>Status:</b> ${data.isEmergency ? '🚨 SOS' : hasBreachedGeofence ? '⚠️ BREACHED' : '🟢 SAFE'}</div>`, { className: 'custom-popup' });
+                        mapMarkers[userId].bindPopup(`<div class="text-slate-900 font-sans text-xs"><b>User:</b> ${data.name || 'Unknown'}<br><b>Status:</b> ${data.isEmergency ? '🚨 SOS' : hasBreachedGeofence ? '⚠️ BREACHED' : '🟢 SAFE'}</div>`, { className: 'custom-popup' });
                     }
 
                     if (data.history && map) {
@@ -405,49 +434,29 @@
                     }
                 });
 
-                document.getElementById('cnt-total').innerText = activeNodes;
-                document.getElementById('cnt-breach').innerText = totalBreaches;
-                document.getElementById('cnt-alert').innerText = totalAlerts;
+                const tNode = document.getElementById('cnt-total');
+                const bNode = document.getElementById('cnt-breach');
+                const aNode = document.getElementById('cnt-alert');
+                
+                if(tNode) tNode.innerText = activeNodes;
+                if(bNode) bNode.innerText = totalBreaches;
+                if(aNode) aNode.innerText = totalAlerts;
 
                 if(groupAlertTriggered) {
-                    emergencyMsg.innerText = compositeAlertMsg;
-                    emergencyBanner.classList.remove('hidden');
-                    siren.play().catch(() => {});
+                    if(emergencyMsg) emergencyMsg.innerText = compositeAlertMsg;
+                    if(emergencyBanner) emergencyBanner.classList.remove('hidden');
+                    if(siren) siren.play().catch(() => {});
                 } else {
-                    emergencyBanner.classList.add('hidden');
-                    siren.pause();
+                    if(emergencyBanner) emergencyBanner.classList.add('hidden');
+                    if(siren) siren.pause();
                 }
             });
         }
 
-        // Logout and Reset Engine Hooks
         const handleLogoutAndClear = () => {
             localStorage.clear();
             window.location.reload();
         };
-        document.getElementById('btn-logout').addEventListener('click', handleLogoutAndClear);
-        document.getElementById('btn-hard-reset').addEventListener('click', handleLogoutAndClear);
-
-        document.getElementById('btn-ble-connect').addEventListener('click', async () => {
-            try {
-                const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'GeoGuard_Button' }], optionalServices: [BLE_SERVICE_UUID] });
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(BLE_SERVICE_UUID);
-                const characteristic = await service.getCharacteristic(BLE_CHARACTERISTIC_UUID);
-                await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', (event) => {
-                    const value = event.target.value.getUint8(0);
-                    set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), value === 1);
-                });
-            } catch (error) { console.error(error); }
-        });
-
-        document.getElementById('btn-panic').addEventListener('click', () => {
-            if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), true);
-        });
-        document.getElementById('dismiss-emergency').addEventListener('click', () => {
-            if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), false);
-        });
-    </script>
-</body>
-</html>
+        
+        if (document.getElementById('btn-logout')) document.getElementById('btn-logout').addEventListener('click', handleLogoutAndClear);
+        if (document.getElementById('btn-hard-reset')) document.getElementById('btn-hard-reset').addEventListener('click', handle
