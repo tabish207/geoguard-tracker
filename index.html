@@ -3,7 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoGuard Terminal - Clear Sight Edition</title>
+    <title>GeoGuard Terminal</title>
+    
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for (var i = 0; i < registrations.length; i++) {
+                    registrations[i].unregister();
+                }
+            });
+        }
+        if ('caches' in window) {
+            caches.keys().then(function(keys) {
+                keys.forEach(function(key) { caches.delete(key); });
+            });
+        }
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -52,7 +68,7 @@
             </div>
 
             <div id="create-group-box" class="hidden space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <input type="text" id="group-name" placeholder="Deployment Area (e.g., Swat Valley)" class="w-full bg-white border border-slate-300 p-2.5 rounded-lg text-sm text-slate-900">
+                <input type="text" id="group-name" placeholder="Deployment Area Name..." class="w-full bg-white border border-slate-300 p-2.5 rounded-lg text-sm text-slate-900">
                 <button id="btn-submit-create" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-md transition-all">Generate Control Domain</button>
             </div>
 
@@ -115,23 +131,9 @@
 
     <audio id="siren-audio" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" loop></audio>
 
- <script type="module">
-        // 📥 CRITICAL FIX: Static imports MUST sit at the absolute top of the module file
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-        // 🚨 Safe Service Worker cache version manager 
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(registrations => {
-                for (let registration of registrations) {
-                    const activeWorker = registration.active || registration.waiting || registration.installing;
-                    const scriptUrl = activeWorker ? activeWorker.scriptURL : '';
-                    if (scriptUrl && !scriptUrl.includes('geoguard-cache-v7')) {
-                        registration.unregister();
-                    }
-                }
-            }).catch(err => console.log('Cache check bypassed:', err));
-        }
 
         const firebaseConfig = {
             apiKey: "AIzaSyCsW2XrO_oBpeTWOlFJKa54bLVlp_ZODtU",
@@ -144,11 +146,9 @@
             measurementId: "G-MGGR7MJBEC"
         };
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // Session Setup Engine
         let currentGroupId = localStorage.getItem('geo_group_id') || null;
         let currentUserId = localStorage.getItem('geo_user_id') || ('user_' + Math.random().toString(36).substring(2, 9));
         let currentUsername = localStorage.getItem('geo_username') || "";
@@ -170,20 +170,17 @@
         const emergencyMsg = document.getElementById('emergency-msg');
         const siren = document.getElementById('siren-audio');
 
-        // Service Worker registration channel
+        // Safe registration pipeline
         if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js', { scope: './' })
                 .then(reg => {
                     if(currentGroupId) syncSessionWithWorker();
-                }).catch(err => console.error("SW Registration Error:", err));
+                }).catch(err => console.error(err));
             });
-            if (Notification.permission !== 'granted') {
-                Notification.requestPermission();
-            }
         }
 
-        // Automatic Session Recovery Boot
+        // Auto Boot Trigger
         if (currentGroupId && currentUsername) {
             if (setupPanel) setupPanel.classList.add('hidden');
             if (trackingPanel) trackingPanel.classList.remove('hidden');
@@ -208,7 +205,7 @@
             }
         }
 
-        // Setup Panel UI Controls
+        // Interaction Wireframes
         document.getElementById('btn-create-mode').addEventListener('click', () => {
             document.getElementById('create-group-box').classList.remove('hidden');
             document.getElementById('join-group-box').classList.add('hidden');
@@ -222,7 +219,7 @@
         document.getElementById('btn-submit-create').addEventListener('click', () => {
             currentUsername = usernameInput.value.trim();
             const groupName = document.getElementById('group-name').value.trim();
-            if(!currentUsername || !groupName) return alert("Please fill out both your name and group name.");
+            if(!currentUsername || !groupName) return alert("Verify core input requirements.");
 
             const groupsRef = ref(db, 'groups');
             const newGroupRef = push(groupsRef);
@@ -230,13 +227,13 @@
 
             set(newGroupRef, { groupName: groupName, createdAt: Date.now(), guideId: currentUserId }).then(() => {
                 commitSessionToStorage(currentGroupId, currentUsername);
-            }).catch(err => alert("Firebase write error: " + err.message));
+            });
         });
 
         document.getElementById('btn-submit-join').addEventListener('click', () => {
             currentUsername = usernameInput.value.trim();
             currentGroupId = document.getElementById('target-group-id').value.trim();
-            if(!currentUsername || !currentGroupId) return alert("Please enter your name and the session key.");
+            if(!currentUsername || !currentGroupId) return alert("Verify core input requirements.");
             commitSessionToStorage(currentGroupId, currentUsername);
         });
 
@@ -294,7 +291,7 @@
                 map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
                 map.invalidateSize();
             } catch (err) {
-                console.error("Map load exception:", err);
+                console.error("Leaflet allocation caught fault:", err);
             }
         }
 
@@ -426,7 +423,6 @@
             });
         }
 
-        // Global Session Clean Out
         const handleLogoutAndClear = () => {
             localStorage.clear();
             window.location.reload();
@@ -455,3 +451,5 @@
             if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), false);
         });
     </script>
+</body>
+</html>
