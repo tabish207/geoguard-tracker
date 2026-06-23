@@ -18,22 +18,28 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         
-        /* 💡 IMPROVEMENT: High contrast layout framework constraints */
+        /* 🚨 CRITICAL STRUCTURAL FIX: Force structural container dimensions */
+        #map-container {
+            position: relative;
+            width: 100%;
+            height: 60vh; /* Fallback for mobile */
+        }
+        @media (min-width: 768px) {
+            #map-container { height: 100vh !important; }
+        }
         #map { 
-            height: 100% !important; 
-            width: 100% !important; 
-            background: #e2e8f0 !important; 
+            position: absolute !important;
+            top: 0; bottom: 0; left: 0; right: 0;
+            width: 100% !important;
+            height: 100% !important;
+            background: #cbd5e1 !important; 
         }
         
-        /* High Contrast Leaflet Draw UI Elements */
         .leaflet-draw-toolbar a { background-color: #ffffff !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
         .leaflet-draw-actions a { background-color: #334155 !important; color: #ffffff !important; }
         
         .custom-popup .leaflet-popup-content-wrapper {
-            background: #1e293b;
-            color: #f8fafc;
-            border-radius: 12px;
-            padding: 4px;
+            background: #1e293b; color: #f8fafc; border-radius: 12px; padding: 4px;
         }
         .custom-popup .leaflet-popup-tip { background: #1e293b; }
     </style>
@@ -118,7 +124,7 @@
             </div>
         </aside>
 
-        <section class="flex-1 h-3/5 md:h-full relative w-full">
+        <section id="map-container" class="flex-1">
             <div id="map"></div>
         </section>
     </main>
@@ -184,7 +190,7 @@
         document.getElementById('btn-submit-create').addEventListener('click', () => {
             currentUsername = usernameInput.value.trim();
             const groupName = document.getElementById('group-name').value.trim();
-            if(!currentUsername || !groupName) return alert("Verify submission configuration inputs.");
+            if(!currentUsername || !groupName) return alert("Verify core fields.");
 
             const groupsRef = ref(db, 'groups');
             const newGroupRef = push(groupsRef);
@@ -198,7 +204,7 @@
         document.getElementById('btn-submit-join').addEventListener('click', () => {
             currentUsername = usernameInput.value.trim();
             currentGroupId = document.getElementById('target-group-id').value.trim();
-            if(!currentUsername || !currentGroupId) return alert("Missing entry profile keys.");
+            if(!currentUsername || !currentGroupId) return alert("Verify submission fields.");
             joinGroupRoster(currentGroupId, currentUsername);
         });
 
@@ -215,10 +221,11 @@
         }
 
         function initiateMappingSystem() {
-            map = L.map('map', { zoomControl: false }).setView([30.3753, 69.3451], 5);
+            if (map !== null) { map.remove(); }
+
+            map = L.map('map', { zoomControl: false, trackResize: true }).setView([30.3753, 69.3451], 5);
             L.control.zoom({ position: 'topright' }).addTo(map);
 
-            // ⚡ LIGHT FIX: Swapped to an enterprise-grade high-contrast Positron gray map 
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
                 attribution: '©OpenStreetMap, ©CartoDB',
                 maxZoom: 20
@@ -246,8 +253,10 @@
 
             map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
 
-            // Instantly compute map sizes without delay loops
+            // 🚨 ENGINE RELAY: Double force canvas boundary calculations to snap out of collapsing blocks
             map.invalidateSize();
+            setTimeout(() => { map.invalidateSize(); }, 300);
+            setTimeout(() => { map.invalidateSize(); }, 800);
         }
 
         function isPointInPolygon(lat, lng, polygon) {
@@ -310,22 +319,12 @@
 
                     if (data.isEmergency || hasBreachedGeofence) {
                         groupAlertTriggered = true;
-                        compositeAlertMsg = data.name.toUpperCase() + (data.isEmergency ? " [SOS SOURCE]" : " [PERIMETER BREACH]");
-                        
-                        if (document.hidden && Notification.permission === "granted") {
-                            new Notification(`⚠️ GEOGUARD THREAT STATE`, {
-                                body: `${data.name} requires situational intervention.`,
-                            });
-                        }
+                        compositeAlertMsg = data.name.toUpperCase() + (data.isEmergency ? " [SOS]" : " [BREACH]");
                     }
 
                     const li = document.createElement('li');
-                    li.className = `p-3 rounded-xl border flex flex-col gap-1 transition-all text-xs ${
-                        data.isEmergency 
-                        ? 'bg-red-500 text-white border-red-600 font-bold' 
-                        : hasBreachedGeofence 
-                        ? 'bg-amber-500 text-slate-900 border-amber-600 font-semibold' 
-                        : 'bg-slate-800 text-slate-100 border-slate-700'
+                    li.className = `p-3 rounded-xl border flex flex-col gap-1 text-xs ${
+                        data.isEmergency ? 'bg-red-500 text-white border-red-600 font-bold' : hasBreachedGeofence ? 'bg-amber-500 text-slate-900 border-amber-600 font-semibold' : 'bg-slate-800 text-slate-100 border-slate-700'
                     }`;
                     
                     li.innerHTML = `
@@ -338,7 +337,6 @@
                     `;
                     rosterList.appendChild(li);
 
-                    // ⚡ HIGH CONTRAST MARKERS: Swap map dot styles dynamically
                     const markerColor = data.isEmergency ? 'red' : hasBreachedGeofence ? 'orange' : 'blue';
                     const targetIcon = L.icon({
                         iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColor}.png`,
