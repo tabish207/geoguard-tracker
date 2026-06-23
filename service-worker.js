@@ -1,6 +1,6 @@
 // service-worker.js - Resilient Production Edge Caching & Background Monitor
-const CACHE_NAME = 'geoguard-cache-v5';
-let eventStreamSource = null;
+const CACHE_NAME = 'geoguard-cache-v6';
+let dynamicIntervalId = null;
 
 const ASSETS = [
   './',
@@ -26,7 +26,7 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
-// 🔒 BACKGROUND RADAR CORE: Communicates with front-end variables to track events offline
+// 🔒 CRASH-PROOF BACKGROUND RADAR: Replaced EventSource with native fetch loops
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SYNC_SESSION') {
     const { groupId, userId, firebaseConfig } = event.data;
@@ -35,29 +35,31 @@ self.addEventListener('message', (event) => {
 });
 
 function initiateBackgroundMonitor(groupId, activeUser, databaseURL) {
-  if (eventStreamSource) eventStreamSource.close();
+  if (dynamicIntervalId) clearInterval(dynamicIntervalId);
 
-  // Create an explicit background event channel using Firebase REST streaming protocol
   const streamUrl = `${databaseURL}/groups/${groupId}/members.json`;
   
-  eventStreamSource = new EventSource(streamUrl);
-  
-  eventStreamSource.addEventListener('put', (e) => {
-    const streamPayload = JSON.parse(e.data);
-    if (!streamPayload || !streamPayload.data) return;
+  // High-reliability background polling loop
+  dynamicIntervalId = setInterval(async () => {
+    try {
+      const response = await fetch(streamUrl);
+      if (!response.ok) return;
+      
+      const rosterData = await response.json();
+      if (!rosterData) return;
 
-    const rosterData = streamPayload.data;
-
-    // Check for incoming SOS events from other members
-    Object.keys(rosterData).forEach(memberId => {
-      if (memberId !== activeUser && rosterData[memberId].isEmergency === true) {
-        triggerSystemNotification(
-          `CRITICAL SOS: ${rosterData[memberId].name}`,
-          `Operator is reporting an emergency emergency situation! Check your GeoGuard terminal grid coordinates immediately.`
-        );
-      }
-    });
-  });
+      Object.keys(rosterData).forEach(memberId => {
+        if (memberId !== activeUser && rosterData[memberId].isEmergency === true) {
+          triggerSystemNotification(
+            `CRITICAL SOS: ${rosterData[memberId].name}`,
+            `Operator needs assistance! Check your GeoGuard terminal grid coordinates immediately.`
+          );
+        }
+      });
+    } catch (err) {
+      console.error("Background trace failed:", err);
+    }
+  }, 10000); // Scans every 10 seconds in the background
 }
 
 function triggerSystemNotification(headline, summary) {
