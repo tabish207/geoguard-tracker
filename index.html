@@ -147,7 +147,7 @@
 
     <audio id="siren-audio" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" loop></audio>
 
-    <script type="module">
+   <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
@@ -165,12 +165,14 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        let currentGroupId = null;
-        let currentUserId = 'user_' + Math.random().toString(36).substring(2, 9);
-        let currentUsername = "";
+        // 🔄 PERSISTENCE ENGINE: Recover existing session settings from device flash storage
+        let currentGroupId = localStorage.getItem('geo_group_id') || null;
+        let currentUserId = localStorage.getItem('geo_user_id') || ('user_' + Math.random().toString(36).substring(2, 9));
+        let currentUsername = localStorage.getItem('geo_username') || "";
+        localStorage.setItem('geo_user_id', currentUserId); // Lock in unique device tracking ID
+
         let map = null;
         let wakeLock = null;
-        
         let mapMarkers = {};
         let mapPolylines = {}; 
         let activeGeofencePolygon = null; 
@@ -185,18 +187,43 @@
         const emergencyMsg = document.getElementById('emergency-msg');
         const siren = document.getElementById('siren-audio');
 
-        // Safe registration context loop
+        // Service Worker Verification Channel
         if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js', { scope: './' })
-                .then(reg => console.log('Background Engine Active'))
+                .then(reg => {
+                    console.log('Production Background Engine Synced');
+                    // Share active configurations with the background execution tier
+                    if(currentGroupId) syncSessionWithWorker();
+                })
                 .catch(err => console.error(err));
             });
             Notification.requestPermission();
         }
 
+        // Auto-Login Sequence Check
+        if (currentGroupId && currentUsername) {
+            setupPanel.classList.add('hidden');
+            trackingPanel.classList.remove('hidden');
+            requestScreenWakeLock();
+            initiateMappingSystem();
+            startLiveGeolocationTracking();
+            listenToGroupRealtimeChanges();
+        }
+
         async function requestScreenWakeLock() {
             try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) {}
+        }
+
+        function syncSessionWithWorker() {
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'SYNC_SESSION',
+                    groupId: currentGroupId,
+                    userId: currentUserId,
+                    firebaseConfig: firebaseConfig
+                });
+            }
         }
 
         document.getElementById('btn-create-mode').addEventListener('click', () => {
@@ -218,7 +245,7 @@
             currentGroupId = newGroupRef.key;
 
             set(newGroupRef, { groupName: groupName, createdAt: Date.now(), guideId: currentUserId }).then(() => {
-                joinGroupRoster(currentGroupId, currentUsername);
+                commitSessionToStorage(currentGroupId, currentUsername);
             });
         });
 
@@ -226,10 +253,13 @@
             currentUsername = usernameInput.value.trim();
             currentGroupId = document.getElementById('target-group-id').value.trim();
             if(!currentUsername || !currentGroupId) return alert("Verify submission fields.");
-            joinGroupRoster(currentGroupId, currentUsername);
+            commitSessionToStorage(currentGroupId, currentUsername);
         });
 
-        function joinGroupRoster(groupId, name) {
+        function commitSessionToStorage(groupId, name) {
+            localStorage.setItem('geo_group_id', groupId);
+            localStorage.setItem('geo_username', name);
+            
             const memberRef = ref(db, `groups/${groupId}/members/${currentUserId}`);
             set(memberRef, { name: name, lat: 0.0, lng: 0.0, isEmergency: false }).then(() => {
                 setupPanel.classList.add('hidden');
@@ -238,6 +268,7 @@
                 initiateMappingSystem();
                 startLiveGeolocationTracking();
                 listenToGroupRealtimeChanges();
+                syncSessionWithWorker();
             });
         }
 
@@ -247,7 +278,6 @@
             map = L.map('map', { zoomControl: false, trackResize: true }).setView([30.3753, 69.3451], 5);
             L.control.zoom({ position: 'topright' }).addTo(map);
 
-            // 🎨 COLOR RESTORED: Sharp, detailed OpenStreetMap layer configuration
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors',
                 maxZoom: 19,
@@ -276,7 +306,6 @@
 
             map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
 
-            // Multi-pass recalculation to handle layout changes dynamically
             map.invalidateSize();
             setTimeout(() => { map.invalidateSize(); }, 300);
             setTimeout(() => { map.invalidateSize(); }, 800);
@@ -423,5 +452,3 @@
             set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), false);
         });
     </script>
-</body>
-</html>
