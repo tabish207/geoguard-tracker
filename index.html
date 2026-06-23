@@ -129,7 +129,7 @@
         </section>
     </main>
 
-    <audio id="siren-audio" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" loop></audio>
+    <audio id="siren-audio" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav" loop prefetch="auto"></audio>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -180,14 +180,39 @@
             });
         }
 
-        // Auto Boot Trigger
+        // 🛡️ Automatic Session Recovery Boot with Security Gate Interaction Overlay
         if (currentGroupId && currentUsername) {
             if (setupPanel) setupPanel.classList.add('hidden');
             if (trackingPanel) trackingPanel.classList.remove('hidden');
-            requestScreenWakeLock();
-            initiateMappingSystem();
-            startLiveGeolocationTracking();
-            listenToGroupRealtimeChanges();
+            
+            const unlockOverlay = document.createElement('div');
+            unlockOverlay.id = 'audio-unlock-shutter';
+            unlockOverlay.className = 'fixed inset-0 bg-slate-950/95 z-[99999] flex flex-col items-center justify-center p-6 text-center gap-4';
+            unlockOverlay.innerHTML = `
+                <h3 class="text-white font-bold text-lg tracking-wide uppercase">Telemetry Node Recovered</h3>
+                <p class="text-slate-400 text-xs max-w-xs leading-relaxed">System requires an interface confirmation check to arm local audio warning engines.</p>
+                <button id="btn-audio-activate" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase px-6 py-3 rounded-xl tracking-wider shadow-lg transition-all mt-2">
+                    Arm Terminal Audio
+                </button>
+            `;
+            document.body.appendChild(unlockOverlay);
+
+            document.getElementById('btn-audio-activate').addEventListener('click', () => {
+                if (siren) {
+                    siren.play().then(() => {
+                        siren.pause();
+                        siren.currentTime = 0;
+                        unlockOverlay.remove();
+                        
+                        requestScreenWakeLock();
+                        initiateMappingSystem();
+                        startLiveGeolocationTracking();
+                        listenToGroupRealtimeChanges();
+                    }).catch(() => {
+                        unlockOverlay.remove();
+                    });
+                }
+            });
         }
 
         async function requestScreenWakeLock() {
@@ -241,6 +266,14 @@
             localStorage.setItem('geo_group_id', groupId);
             localStorage.setItem('geo_username', name);
             
+            // Prime audio element directly inside user gesture loop
+            if (siren) {
+                siren.play().then(() => {
+                    siren.pause();
+                    siren.currentTime = 0;
+                }).catch(e => console.log("Audio priming bypassed:", e));
+            }
+            
             const memberRef = ref(db, `groups/${groupId}/members/${currentUserId}`);
             set(memberRef, { name: name, lat: 0.0, lng: 0.0, isEmergency: false }).then(() => {
                 if (setupPanel) setupPanel.classList.add('hidden');
@@ -291,7 +324,7 @@
                 map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
                 map.invalidateSize();
             } catch (err) {
-                console.error("Leaflet allocation caught fault:", err);
+                console.error("Leaflet core allocation fault:", err);
             }
         }
 
@@ -412,13 +445,25 @@
                 document.getElementById('cnt-breach').innerText = totalBreaches;
                 document.getElementById('cnt-alert').innerText = totalAlerts;
 
-                if(groupAlertTriggered) {
-                    if(emergencyMsg) emergencyMsg.innerText = compositeAlertMsg;
-                    if(emergencyBanner) emergencyBanner.classList.remove('hidden');
-                    if(siren) siren.play().catch(() => {});
+                // --- HIGH-INTENSITY AUDIO ENGINE INTERFACE TRUCKING ---
+                if (groupAlertTriggered) {
+                    if (emergencyMsg) emergencyMsg.innerText = compositeAlertMsg;
+                    if (emergencyBanner) emergencyBanner.classList.remove('hidden');
+                    
+                    if (siren) {
+                        siren.volume = 1.0; 
+                        siren.addEventListener('ended', function() {
+                            this.currentTime = 0;
+                            this.play().catch(() => {});
+                        }, false);
+                        siren.play().catch((err) => console.log("Autoplay blocked block:", err));
+                    }
                 } else {
-                    if(emergencyBanner) emergencyBanner.classList.add('hidden');
-                    if(siren) siren.pause();
+                    if (emergencyBanner) emergencyBanner.classList.add('hidden');
+                    if (siren) {
+                        siren.pause();
+                        siren.currentTime = 0;
+                    }
                 }
             });
         }
