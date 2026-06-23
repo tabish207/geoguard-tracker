@@ -115,26 +115,23 @@
 
     <audio id="siren-audio" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" loop></audio>
 
-  <script type="module">
-        // 🚨 FIXED: Safe, crash-proof service worker purging logic
+ <script type="module">
+        // 📥 CRITICAL FIX: Static imports MUST sit at the absolute top of the module file
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // 🚨 Safe Service Worker cache version manager 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(registrations => {
                 for (let registration of registrations) {
                     const activeWorker = registration.active || registration.waiting || registration.installing;
                     const scriptUrl = activeWorker ? activeWorker.scriptURL : '';
-                    
-                    // Only unregister if it's genuinely an outdated build
-                    if (scriptUrl && !scriptUrl.includes('geoguard-cache-v6')) {
-                        registration.unregister().then(() => {
-                            console.log('Purged legacy service worker engine smoothly.');
-                        });
+                    if (scriptUrl && !scriptUrl.includes('geoguard-cache-v7')) {
+                        registration.unregister();
                     }
                 }
-            }).catch(err => console.log('Service worker cleanup bypassed:', err));
+            }).catch(err => console.log('Cache check bypassed:', err));
         }
-
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCsW2XrO_oBpeTWOlFJKa54bLVlp_ZODtU",
@@ -147,15 +144,11 @@
             measurementId: "G-MGGR7MJBEC"
         };
 
-        // Initialize Firebase safely
-        let app, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getDatabase(app);
-        } catch (e) {
-            console.error("Firebase core failed to boot:", e);
-        }
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
 
+        // Session Setup Engine
         let currentGroupId = localStorage.getItem('geo_group_id') || null;
         let currentUserId = localStorage.getItem('geo_user_id') || ('user_' + Math.random().toString(36).substring(2, 9));
         let currentUsername = localStorage.getItem('geo_username') || "";
@@ -177,32 +170,27 @@
         const emergencyMsg = document.getElementById('emergency-msg');
         const siren = document.getElementById('siren-audio');
 
+        // Service Worker registration channel
         if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js', { scope: './' })
                 .then(reg => {
                     if(currentGroupId) syncSessionWithWorker();
-                }).catch(err => console.error("SW Register Error:", err));
+                }).catch(err => console.error("SW Registration Error:", err));
             });
             if (Notification.permission !== 'granted') {
                 Notification.requestPermission();
             }
         }
 
-        // 🛡️ SAFE BOOT SEQUENCE
-        try {
-            if (currentGroupId && currentUsername && db) {
-                if (setupPanel) setupPanel.classList.add('hidden');
-                if (trackingPanel) trackingPanel.classList.remove('hidden');
-                requestScreenWakeLock();
-                initiateMappingSystem();
-                startLiveGeolocationTracking();
-                listenToGroupRealtimeChanges();
-            }
-        } catch (e) {
-            console.error("Auto-login error protection fallback triggered:", e);
-            localStorage.clear();
-            if (setupPanel) setupPanel.classList.remove('hidden');
+        // Automatic Session Recovery Boot
+        if (currentGroupId && currentUsername) {
+            if (setupPanel) setupPanel.classList.add('hidden');
+            if (trackingPanel) trackingPanel.classList.remove('hidden');
+            requestScreenWakeLock();
+            initiateMappingSystem();
+            startLiveGeolocationTracking();
+            listenToGroupRealtimeChanges();
         }
 
         async function requestScreenWakeLock() {
@@ -220,49 +208,42 @@
             }
         }
 
-        if (document.getElementById('btn-create-mode')) {
-            document.getElementById('btn-create-mode').addEventListener('click', () => {
-                document.getElementById('create-group-box').classList.toggle('hidden');
-                document.getElementById('join-group-box').classList.add('hidden');
-            });
-        }
-        if (document.getElementById('btn-join-mode')) {
-            document.getElementById('btn-join-mode').addEventListener('click', () => {
-                document.getElementById('join-group-box').classList.toggle('hidden');
-                document.getElementById('create-group-box').classList.add('hidden');
-            });
-        }
+        // Setup Panel UI Controls
+        document.getElementById('btn-create-mode').addEventListener('click', () => {
+            document.getElementById('create-group-box').classList.remove('hidden');
+            document.getElementById('join-group-box').classList.add('hidden');
+        });
 
-        if (document.getElementById('btn-submit-create')) {
-            document.getElementById('btn-submit-create').addEventListener('click', () => {
-                currentUsername = usernameInput.value.trim();
-                const groupName = document.getElementById('group-name').value.trim();
-                if(!currentUsername || !groupName || !db) return alert("Verify core fields.");
+        document.getElementById('btn-join-mode').addEventListener('click', () => {
+            document.getElementById('join-group-box').classList.remove('hidden');
+            document.getElementById('create-group-box').classList.add('hidden');
+        });
 
-                const groupsRef = ref(db, 'groups');
-                const newGroupRef = push(groupsRef);
-                currentGroupId = newGroupRef.key;
+        document.getElementById('btn-submit-create').addEventListener('click', () => {
+            currentUsername = usernameInput.value.trim();
+            const groupName = document.getElementById('group-name').value.trim();
+            if(!currentUsername || !groupName) return alert("Please fill out both your name and group name.");
 
-                set(newGroupRef, { groupName: groupName, createdAt: Date.now(), guideId: currentUserId }).then(() => {
-                    commitSessionToStorage(currentGroupId, currentUsername);
-                });
-            });
-        }
+            const groupsRef = ref(db, 'groups');
+            const newGroupRef = push(groupsRef);
+            currentGroupId = newGroupRef.key;
 
-        if (document.getElementById('btn-submit-join')) {
-            document.getElementById('btn-submit-join').addEventListener('click', () => {
-                currentUsername = usernameInput.value.trim();
-                currentGroupId = document.getElementById('target-group-id').value.trim();
-                if(!currentUsername || !currentGroupId) return alert("Verify submission fields.");
+            set(newGroupRef, { groupName: groupName, createdAt: Date.now(), guideId: currentUserId }).then(() => {
                 commitSessionToStorage(currentGroupId, currentUsername);
-            });
-        }
+            }).catch(err => alert("Firebase write error: " + err.message));
+        });
+
+        document.getElementById('btn-submit-join').addEventListener('click', () => {
+            currentUsername = usernameInput.value.trim();
+            currentGroupId = document.getElementById('target-group-id').value.trim();
+            if(!currentUsername || !currentGroupId) return alert("Please enter your name and the session key.");
+            commitSessionToStorage(currentGroupId, currentUsername);
+        });
 
         function commitSessionToStorage(groupId, name) {
             localStorage.setItem('geo_group_id', groupId);
             localStorage.setItem('geo_username', name);
             
-            if (!db) return;
             const memberRef = ref(db, `groups/${groupId}/members/${currentUserId}`);
             set(memberRef, { name: name, lat: 0.0, lng: 0.0, isEmergency: false }).then(() => {
                 if (setupPanel) setupPanel.classList.add('hidden');
@@ -278,7 +259,6 @@
         function initiateMappingSystem() {
             try {
                 if (map !== null) { map.remove(); map = null; }
-
                 const mapEl = document.getElementById('map');
                 if (!mapEl) return;
 
@@ -312,11 +292,9 @@
                 });
 
                 map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
-
                 map.invalidateSize();
-                setTimeout(() => { if (map) map.invalidateSize(); }, 400);
             } catch (err) {
-                console.error("Leaflet core map startup caught an error:", err);
+                console.error("Map load exception:", err);
             }
         }
 
@@ -341,7 +319,7 @@
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     
-                    if(currentGroupId && db) {
+                    if(currentGroupId) {
                         set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lat`), lat);
                         set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lng`), lng);
                         
@@ -353,13 +331,12 @@
         }
 
         function listenToGroupRealtimeChanges() {
-            if (!db || !currentGroupId) return;
+            if (!currentGroupId) return;
 
             onValue(ref(db, `groups/${currentGroupId}/groupName`), (snapshot) => {
                 const nameNode = document.getElementById('display-group-name');
                 if(nameNode) nameNode.innerText = snapshot.val() || "Active Session";
-                const idNode = document.getElementById('display-group-id');
-                if(idNode) idNode.innerText = currentGroupId;
+                document.getElementById('display-group-id').innerText = currentGroupId;
             });
 
             onValue(ref(db, `groups/${currentGroupId}/members`), (snapshot) => {
@@ -434,13 +411,9 @@
                     }
                 });
 
-                const tNode = document.getElementById('cnt-total');
-                const bNode = document.getElementById('cnt-breach');
-                const aNode = document.getElementById('cnt-alert');
-                
-                if(tNode) tNode.innerText = activeNodes;
-                if(bNode) bNode.innerText = totalBreaches;
-                if(aNode) aNode.innerText = totalAlerts;
+                document.getElementById('cnt-total').innerText = activeNodes;
+                document.getElementById('cnt-breach').innerText = totalBreaches;
+                document.getElementById('cnt-alert').innerText = totalAlerts;
 
                 if(groupAlertTriggered) {
                     if(emergencyMsg) emergencyMsg.innerText = compositeAlertMsg;
@@ -453,10 +426,32 @@
             });
         }
 
+        // Global Session Clean Out
         const handleLogoutAndClear = () => {
             localStorage.clear();
             window.location.reload();
         };
-        
-        if (document.getElementById('btn-logout')) document.getElementById('btn-logout').addEventListener('click', handleLogoutAndClear);
-        if (document.getElementById('btn-hard-reset')) document.getElementById('btn-hard-reset').addEventListener('click', handle
+        document.getElementById('btn-logout').addEventListener('click', handleLogoutAndClear);
+        document.getElementById('btn-hard-reset').addEventListener('click', handleLogoutAndClear);
+
+        document.getElementById('btn-ble-connect').addEventListener('click', async () => {
+            try {
+                const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'GeoGuard_Button' }], optionalServices: [BLE_SERVICE_UUID] });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+                const characteristic = await service.getCharacteristic(BLE_CHARACTERISTIC_UUID);
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                    const value = event.target.value.getUint8(0);
+                    if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), value === 1);
+                });
+            } catch (error) { console.error(error); }
+        });
+
+        document.getElementById('btn-panic').addEventListener('click', () => {
+            if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), true);
+        });
+        document.getElementById('dismiss-emergency').addEventListener('click', () => {
+            if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), false);
+        });
+    </script>
