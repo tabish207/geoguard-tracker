@@ -129,7 +129,7 @@
         </section>
     </main>
 
-   <audio id="siren-audio" src="https://assets.mixkit.co/active_storage/sfx/1001/1001-84.wav" loop prefetch="auto"></audio>
+    <audio id="siren-audio" src="https://assets.mixkit.co/active_storage/sfx/1001/1001-84.wav" loop prefetch="auto"></audio>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -160,6 +160,11 @@
         let mapPolylines = {}; 
         let activeGeofencePolygon = null; 
 
+        // GPS Drift baseline memory
+        let lastValidLat = null;
+        let lastValidLng = null;
+        const MIN_MOVEMENT_THRESHOLD = 0.0001; // Restricts erratic drift updates (~10-15m variation)
+
         const BLE_SERVICE_UUID = "4fa4c201-1fb2-45fe-a28a-75dec6c0e453";
         const BLE_CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
@@ -170,7 +175,38 @@
         const emergencyMsg = document.getElementById('emergency-msg');
         const siren = document.getElementById('siren-audio');
 
-        // Safe registration pipeline
+        // Resilient Offline Queue Configuration
+        const STORAGE_KEY = `geoguard_offline_buffer_${currentUserId}`;
+
+        function bufferLocationOffline(lat, lng) {
+            try {
+                let buffer = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+                buffer.push({ lat: lat, lng: lng, timestamp: Date.now() });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(buffer));
+                console.warn(`[Offline] Saved snapshot locally. Queue size: ${buffer.length}`);
+            } catch (e) {
+                console.error("Local queue crash:", e);
+            }
+        }
+
+        function flushOfflineBuffer() {
+            if (!navigator.onLine || !currentGroupId) return;
+            try {
+                let buffer = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+                if (buffer.length === 0) return;
+                
+                console.log(`[Online] Processing telemetry sync engine... Uploading ${buffer.length} logs.`);
+                const historyRef = ref(db, `groups/${currentGroupId}/members/${currentUserId}/history`);
+                
+                buffer.forEach(point => { push(historyRef, point); });
+                localStorage.removeItem(STORAGE_KEY);
+            } catch (e) {
+                console.error("Sync pipeline structural fault:", e);
+            }
+        }
+
+        window.addEventListener('online', flushOfflineBuffer);
+
         if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js', { scope: './' })
@@ -180,7 +216,6 @@
             });
         }
 
-        // 🛡️ Automatic Session Recovery Boot with Security Gate Interaction Overlay
         if (currentGroupId && currentUsername) {
             if (setupPanel) setupPanel.classList.add('hidden');
             if (trackingPanel) trackingPanel.classList.remove('hidden');
@@ -230,7 +265,6 @@
             }
         }
 
-        // Interaction Wireframes
         document.getElementById('btn-create-mode').addEventListener('click', () => {
             document.getElementById('create-group-box').classList.remove('hidden');
             document.getElementById('join-group-box').classList.add('hidden');
@@ -266,7 +300,6 @@
             localStorage.setItem('geo_group_id', groupId);
             localStorage.setItem('geo_username', name);
             
-            // Prime audio element directly inside user gesture loop
             if (siren) {
                 siren.play().then(() => {
                     siren.pause();
@@ -348,15 +381,44 @@
                 navigator.geolocation.watchPosition((position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+
+                    // 🛑 DRIFT FILTER 1: Skip updates with low precision variances (>30m bounds)
+                    if (accuracy > 30) {
+                        console.warn(`[GPS Filtered] Reading dropped due to low precision bounds (${accuracy}m accuracy).`);
+                        return;
+                    }
+
+                    // 🛑 DRIFT FILTER 2: Compare distance shift delta matrices
+                    if (lastValidLat !== null && lastValidLng !== null) {
+                        const latDelta = Math.abs(lat - lastValidLat);
+                        const lngDelta = Math.abs(lng - lastValidLng);
+                        if (latDelta < MIN_MOVEMENT_THRESHOLD && lngDelta < MIN_MOVEMENT_THRESHOLD) {
+                            return; // Suppress coordinate jump anomalies while stationary
+                        }
+                    }
+
+                    lastValidLat = lat;
+                    lastValidLng = lng;
                     
                     if(currentGroupId) {
-                        set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lat`), lat);
-                        set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lng`), lng);
-                        
-                        const historyRef = ref(db, `groups/${currentGroupId}/members/${currentUserId}/history`);
-                        push(historyRef, { lat: lat, lng: lng, timestamp: Date.now() });
+                        if (navigator.onLine) {
+                            set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lat`), lat);
+                            set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lng`), lng);
+                            
+                            const historyRef = ref(db, `groups/${currentGroupId}/members/${currentUserId}/history`);
+                            push(historyRef, { lat: lat, lng: lng, timestamp: Date.now() });
+                            
+                            flushOfflineBuffer();
+                        } else {
+                            bufferLocationOffline(lat, lng);
+                        }
                     }
-                }, (error) => console.error(error), { enableHighAccuracy: true });
+                }, (error) => console.error(error), { 
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 10000
+                });
             }
         }
 
@@ -445,7 +507,6 @@
                 document.getElementById('cnt-breach').innerText = totalBreaches;
                 document.getElementById('cnt-alert').innerText = totalAlerts;
 
-                // --- HIGH-INTENSITY AUDIO ENGINE INTERFACE TRUCKING ---
                 if (groupAlertTriggered) {
                     if (emergencyMsg) emergencyMsg.innerText = compositeAlertMsg;
                     if (emergencyBanner) emergencyBanner.classList.remove('hidden');
