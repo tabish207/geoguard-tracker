@@ -233,7 +233,6 @@
             if (setupPanel) setupPanel.classList.add('hidden');
             if (trackingPanel) trackingPanel.classList.remove('hidden');
             
-            // Check if this user is the group head
             get(ref(db, `groups/${currentGroupId}/guideId`)).then((snapshot) => {
                 if (snapshot.exists() && snapshot.val() === currentUserId) {
                     isGroupCreator = true;
@@ -284,7 +283,7 @@
             const groupsRef = ref(db, 'groups');
             const newGroupRef = push(groupsRef);
             currentGroupId = newGroupRef.key;
-            isGroupCreator = true; // Created the group, you are the head.
+            isGroupCreator = true; 
 
             set(newGroupRef, { groupName: groupName, createdAt: Date.now(), guideId: currentUserId }).then(() => {
                 commitSessionToStorage(currentGroupId, currentUsername);
@@ -295,7 +294,7 @@
             currentUsername = usernameInput.value.trim();
             currentGroupId = document.getElementById('target-group-id').value.trim();
             if(!currentUsername || !currentGroupId) return alert("Please fill in both fields.");
-            isGroupCreator = false; // Joining someone else's group.
+            isGroupCreator = false; 
             commitSessionToStorage(currentGroupId, currentUsername);
         });
 
@@ -335,7 +334,6 @@
                 const drawnItems = new L.FeatureGroup();
                 map.addLayer(drawnItems);
 
-                // ONLY show drawing tools if you are the group head/creator
                 if (isGroupCreator) {
                     const drawControl = new L.Control.Draw({
                         position: 'topleft',
@@ -408,7 +406,6 @@
             }
         }
 
-        // Synchronize interface modifications live
         function listenToGroupRealtimeChanges() {
             if (!currentGroupId) return;
 
@@ -499,7 +496,6 @@
                     if (emergencyMsg) emergencyMsg.innerText = compositeAlertMsg;
                     if (emergencyBanner) emergencyBanner.classList.remove('hidden');
                     
-                    // Permission Check: Show "Turn Off Alarm" button if user is Group Head OR the sender of the SOS
                     if (isGroupCreator || activeEmergencyUserIds.includes(currentUserId)) {
                         dismissEmergencyBtn.classList.remove('hidden');
                     } else {
@@ -521,7 +517,7 @@
         document.getElementById('btn-logout').addEventListener('click', handleLogoutAndClear);
         document.getElementById('btn-hard-reset').addEventListener('click', handleLogoutAndClear);
 
-        // Hardware pairing module
+        // Hardware pairing module (Works for everyone including group creator/owner)
         document.getElementById('btn-ble-connect').addEventListener('click', async () => {
             try {
                 const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'GeoGuard_Button' }], optionalServices: [BLE_SERVICE_UUID] });
@@ -544,12 +540,10 @@
             if (!currentGroupId) return;
             
             if (isGroupCreator) {
-                // Head/creator can turn off ALL active alarms in the group
                 activeEmergencyUserIds.forEach(id => {
                     set(ref(db, `groups/${currentGroupId}/members/${id}/isEmergency`), false);
                 });
             } else if (activeEmergencyUserIds.includes(currentUserId)) {
-                // Regular person can turn off their own alarm
                 set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), false);
             }
         });
