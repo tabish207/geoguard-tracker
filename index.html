@@ -16,8 +16,6 @@
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #0f172a; }
         #map { width: 100%; height: 100%; background: #1e293b; }
         .leaflet-container { font-family: ui-sans-serif, system-ui, sans-serif; }
-        .leaflet-draw-toolbar a { background-color: #1e293b !important; border-bottom: 1px solid #334155 !important; color: #f8fafc !important; }
-        .leaflet-draw-toolbar a:hover { background-color: #334155 !important; }
     </style>
 </head>
 <body class="text-slate-200">
@@ -30,8 +28,8 @@
             </span>
             <p class="text-xs font-bold tracking-wider uppercase">EMERGENCY ALERT: <span id="emergency-msg" class="font-mono ml-1"></span></p>
         </div>
-        <button id="dismiss-emergency" class="bg-black/20 hover:bg-black/40 text-white font-sans text-xs uppercase px-4 py-1.5 rounded-lg transition-all border border-white/20">
-            Dismiss Alarm
+        <button id="dismiss-emergency" class="hidden bg-black/20 hover:bg-black/40 text-white font-sans text-xs uppercase px-4 py-1.5 rounded-lg transition-all border border-white/20">
+            Turn Off Alarm
         </button>
     </div>
 
@@ -39,7 +37,7 @@
         <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-5">
             <div class="text-center">
                 <h1 class="text-xl font-bold text-white uppercase tracking-wide">GeoGuard Tracker</h1>
-                <p class="text-slate-400 text-xs mt-1">Live Location & Geofencing Dashboard</p>
+                <p class="text-slate-400 text-xs mt-1">Share live locations and stay safe together</p>
             </div>
 
             <div class="space-y-2">
@@ -48,22 +46,22 @@
             </div>
 
             <div class="grid grid-cols-2 gap-3 mt-2">
-                <button id="btn-create-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl border border-slate-700 transition-all">Create Group</button>
-                <button id="btn-join-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl border border-slate-700 transition-all">Join Group</button>
+                <button id="btn-create-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl border border-slate-700 transition-all">Create a Group</button>
+                <button id="btn-join-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl border border-slate-700 transition-all">Join a Group</button>
             </div>
 
             <div id="create-group-box" class="hidden space-y-3 pt-2 border-t border-slate-800/60">
                 <div class="space-y-2">
                     <label class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Group Name</label>
-                    <input type="text" id="group-name" placeholder="e.g., Team Alpha" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all text-white" />
+                    <input type="text" id="group-name" placeholder="e.g., Friends & Family" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all text-white" />
                 </div>
                 <button id="btn-submit-create" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase py-3 rounded-xl tracking-wider transition-all">Create and Start</button>
             </div>
 
             <div id="join-group-box" class="hidden space-y-3 pt-2 border-t border-slate-800/60">
                 <div class="space-y-2">
-                    <label class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Group ID Token</label>
-                    <input type="text" id="target-group-id" placeholder="Paste Group ID here" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-blue-500 transition-all text-white" />
+                    <label class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Group Invite Code</label>
+                    <input type="text" id="target-group-id" placeholder="Paste invite code here" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-blue-500 transition-all text-white" />
                 </div>
                 <button id="btn-submit-join" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase py-3 rounded-xl tracking-wider transition-all">Join Group</button>
             </div>
@@ -78,18 +76,18 @@
                 <div class="flex items-center justify-between border-b border-slate-900 pb-3">
                     <div>
                         <h2 id="display-group-name" class="font-bold text-white text-sm truncate max-w-[180px]">Active Group</h2>
-                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">ID: <span id="display-group-id" class="select-all cursor-pointer hover:text-blue-400">---</span></p>
+                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">Invite Code: <span id="display-group-id" class="select-all cursor-pointer hover:text-blue-400">---</span></p>
                     </div>
-                    <button id="btn-logout" class="text-slate-400 hover:text-red-400 text-[10px] uppercase font-bold px-2.5 py-1 rounded bg-slate-900 border border-slate-800 transition-all">Log Out</button>
+                    <button id="btn-logout" class="text-slate-400 hover:text-red-400 text-[10px] uppercase font-bold px-2.5 py-1 rounded bg-slate-900 border border-slate-800 transition-all">Leave</button>
                 </div>
 
                 <div class="grid grid-cols-3 gap-2 text-center">
                     <div class="bg-slate-900/50 border border-slate-900 p-2 rounded-xl">
-                        <div class="text-[9px] font-bold text-slate-500 uppercase">Users</div>
+                        <div class="text-[9px] font-bold text-slate-500 uppercase">People</div>
                         <div id="cnt-total" class="text-base font-bold text-white mt-0.5">0</div>
                     </div>
                     <div class="bg-slate-900/50 border border-slate-900 p-2 rounded-xl">
-                        <div class="text-[9px] font-bold text-amber-500/80 uppercase">Breaches</div>
+                        <div class="text-[9px] font-bold text-amber-500/80 uppercase">Outside</div>
                         <div id="cnt-breach" class="text-base font-bold text-amber-500 mt-0.5">0</div>
                     </div>
                     <div class="bg-slate-900/50 border border-slate-900 p-2 rounded-xl">
@@ -107,12 +105,12 @@
 
             <div class="p-4 border-t border-slate-900 bg-slate-950/80 space-y-2 shrink-0">
                 <button id="btn-ble-connect" class="w-full bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 font-bold text-[11px] uppercase py-3 px-4 rounded-xl tracking-wider transition-all flex items-center justify-center gap-2">
-                    <span class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span> Connect Emergency Button
+                    <span class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span> Pair Emergency Button Hardware
                 </button>
                 <button id="btn-panic" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] uppercase py-3 rounded-xl tracking-wider transition-all">
-                    Trigger Panic Alarm
+                    Send Emergency SOS
                 </button>
-                <button id="btn-hard-reset" class="w-full text-slate-600 hover:text-slate-400 text-[9px] font-mono uppercase tracking-widest text-center block pt-1">Reset Application</button>
+                <button id="btn-hard-reset" class="w-full text-slate-600 hover:text-slate-400 text-[9px] font-mono uppercase tracking-widest text-center block pt-1">Reset App</button>
             </div>
         </div>
 
@@ -125,7 +123,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCsW2XrO_oBpeTWOlFJKa54bLVlp_ZODtU",
@@ -152,8 +150,9 @@
         let mapMarkers = {};
         let mapPolylines = {}; 
         let activeGeofencePolygon = null; 
+        let isGroupCreator = false; 
+        let activeEmergencyUserIds = [];
 
-        // CRITICAL FIX: These variables are declared exactly ONCE here at the top.
         let lastValidLat = null;
         let lastValidLng = null;
         const MIN_MOVEMENT_THRESHOLD = 0.0001; 
@@ -166,10 +165,10 @@
         const usernameInput = document.getElementById('username');
         const emergencyBanner = document.getElementById('emergency-banner');
         const emergencyMsg = document.getElementById('emergency-msg');
+        const dismissEmergencyBtn = document.getElementById('dismiss-emergency');
 
         const STORAGE_KEY = `geoguard_offline_buffer_${currentUserId}`;
 
-        // In-Browser Audio Alarm Setup (Web Audio API)
         let audioCtx = null;
         let alarmIntervalId = null;
 
@@ -186,7 +185,7 @@
                 let gain = audioCtx.createGain();
                 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(880, audioCtx.currentTime); // Standard beep tone
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
                 
                 gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
@@ -229,39 +228,37 @@
 
         window.addEventListener('online', flushOfflineBuffer);
 
-        // Service Worker Management
-        if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js', { scope: './' })
-                .then(reg => { if(currentGroupId) syncSessionWithWorker(); })
-                .catch(err => console.error(err));
-            });
-        }
-
         // Automatic Session Recovery Handling
         if (currentGroupId && currentUsername) {
             if (setupPanel) setupPanel.classList.add('hidden');
             if (trackingPanel) trackingPanel.classList.remove('hidden');
             
-            const unlockOverlay = document.createElement('div');
-            unlockOverlay.id = 'audio-unlock-shutter';
-            unlockOverlay.className = 'fixed inset-0 bg-slate-950/95 z-[99999] flex flex-col items-center justify-center p-6 text-center gap-4';
-            unlockOverlay.innerHTML = `
-                <h3 class="text-white font-bold text-lg uppercase tracking-wide">Session Found</h3>
-                <p class="text-slate-400 text-xs max-w-xs leading-relaxed">Please click below to activate the map and turn on warning sounds.</p>
-                <button id="btn-audio-activate" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase px-6 py-3 rounded-xl tracking-wider transition-all mt-2">
-                    Activate Terminal
-                </button>
-            `;
-            document.body.appendChild(unlockOverlay);
+            // Check if this user is the group head
+            get(ref(db, `groups/${currentGroupId}/guideId`)).then((snapshot) => {
+                if (snapshot.exists() && snapshot.val() === currentUserId) {
+                    isGroupCreator = true;
+                }
+                
+                const unlockOverlay = document.createElement('div');
+                unlockOverlay.id = 'audio-unlock-shutter';
+                unlockOverlay.className = 'fixed inset-0 bg-slate-950/95 z-[99999] flex flex-col items-center justify-center p-6 text-center gap-4';
+                unlockOverlay.innerHTML = `
+                    <h3 class="text-white font-bold text-lg uppercase tracking-wide">Welcome Back</h3>
+                    <p class="text-slate-400 text-xs max-w-xs leading-relaxed">Tap below to enter your map tracking room.</p>
+                    <button id="btn-audio-activate" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase px-6 py-3 rounded-xl tracking-wider transition-all mt-2">
+                        Enter Room
+                    </button>
+                `;
+                document.body.appendChild(unlockOverlay);
 
-            document.getElementById('btn-audio-activate').addEventListener('click', () => {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                unlockOverlay.remove();
-                requestScreenWakeLock();
-                initiateMappingSystem();
-                startLiveGeolocationTracking();
-                listenToGroupRealtimeChanges();
+                document.getElementById('btn-audio-activate').addEventListener('click', () => {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    unlockOverlay.remove();
+                    requestScreenWakeLock();
+                    initiateMappingSystem();
+                    startLiveGeolocationTracking();
+                    listenToGroupRealtimeChanges();
+                });
             });
         }
 
@@ -269,18 +266,6 @@
             try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) {}
         }
 
-        function syncSessionWithWorker() {
-            if (navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({
-                    type: 'SYNC_SESSION',
-                    groupId: currentGroupId,
-                    userId: currentUserId,
-                    firebaseConfig: firebaseConfig
-                });
-            }
-        }
-
-        // Panel Setup Screen Buttons Click Handlers
         document.getElementById('btn-create-mode').addEventListener('click', () => {
             document.getElementById('create-group-box').classList.remove('hidden');
             document.getElementById('join-group-box').classList.add('hidden');
@@ -294,11 +279,12 @@
         document.getElementById('btn-submit-create').addEventListener('click', () => {
             currentUsername = usernameInput.value.trim();
             const groupName = document.getElementById('group-name').value.trim();
-            if(!currentUsername || !groupName) return alert("Please fill in all fields.");
+            if(!currentUsername || !groupName) return alert("Please type in your name and a group name.");
 
             const groupsRef = ref(db, 'groups');
             const newGroupRef = push(groupsRef);
             currentGroupId = newGroupRef.key;
+            isGroupCreator = true; // Created the group, you are the head.
 
             set(newGroupRef, { groupName: groupName, createdAt: Date.now(), guideId: currentUserId }).then(() => {
                 commitSessionToStorage(currentGroupId, currentUsername);
@@ -308,7 +294,8 @@
         document.getElementById('btn-submit-join').addEventListener('click', () => {
             currentUsername = usernameInput.value.trim();
             currentGroupId = document.getElementById('target-group-id').value.trim();
-            if(!currentUsername || !currentGroupId) return alert("Please fill in all fields.");
+            if(!currentUsername || !currentGroupId) return alert("Please fill in both fields.");
+            isGroupCreator = false; // Joining someone else's group.
             commitSessionToStorage(currentGroupId, currentUsername);
         });
 
@@ -326,11 +313,10 @@
                 initiateMappingSystem();
                 startLiveGeolocationTracking();
                 listenToGroupRealtimeChanges();
-                syncSessionWithWorker();
             });
         }
 
-        // Setup Leaflet Map Container
+        // Setup Map View
         function initiateMappingSystem() {
             try {
                 if (map !== null) { map.remove(); map = null; }
@@ -349,26 +335,30 @@
                 const drawnItems = new L.FeatureGroup();
                 map.addLayer(drawnItems);
 
-                const drawControl = new L.Control.Draw({
-                    position: 'topleft',
-                    draw: {
-                        polygon: { allowIntersection: false, showArea: true, shapeOptions: { color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 3 } },
-                        polyline: false, circle: false, rectangle: false, marker: false, circlemarker: false
-                    },
-                    edit: { featureGroup: drawnItems, remove: true }
-                });
-                map.addControl(drawControl);
+                // ONLY show drawing tools if you are the group head/creator
+                if (isGroupCreator) {
+                    const drawControl = new L.Control.Draw({
+                        position: 'topleft',
+                        draw: {
+                            polygon: { allowIntersection: false, showArea: true, shapeOptions: { color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 3 } },
+                            polyline: false, circle: false, rectangle: false, marker: false, circlemarker: false
+                        },
+                        edit: { featureGroup: drawnItems, remove: true }
+                    });
+                    map.addControl(drawControl);
 
-                map.on(L.Draw.Event.CREATED, function (e) {
-                    if (activeGeofencePolygon) { drawnItems.removeLayer(activeGeofencePolygon); }
-                    activeGeofencePolygon = e.layer;
-                    activeGeofencePolygon.setStyle({ color: '#ea580c', fillColor: '#f97316', fillOpacity: 0.15, weight: 3 });
-                    drawnItems.addLayer(activeGeofencePolygon);
-                });
+                    map.on(L.Draw.Event.CREATED, function (e) {
+                        if (activeGeofencePolygon) { drawnItems.removeLayer(activeGeofencePolygon); }
+                        activeGeofencePolygon = e.layer;
+                        activeGeofencePolygon.setStyle({ color: '#ea580c', fillColor: '#f97316', fillOpacity: 0.15, weight: 3 });
+                        drawnItems.addLayer(activeGeofencePolygon);
+                    });
 
-                map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
+                    map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
+                }
+                
                 map.invalidateSize();
-            } catch (err) { console.error("Map initialization failed:", err); }
+            } catch (err) { console.error(err); }
         }
 
         function isPointInPolygon(lat, lng, polygon) {
@@ -393,7 +383,7 @@
                     const lng = position.coords.longitude;
                     const accuracy = position.coords.accuracy;
 
-                    if (accuracy > 30) return; // Skip inaccurate values
+                    if (accuracy > 30) return; 
 
                     if (lastValidLat !== null && lastValidLng !== null) {
                         const latDelta = Math.abs(lat - lastValidLat);
@@ -401,7 +391,6 @@
                         if (latDelta < MIN_MOVEMENT_THRESHOLD && lngDelta < MIN_MOVEMENT_THRESHOLD) return;
                     }
 
-                    // CRITICAL OPERATION: Update variables without redeclaring 'let'
                     lastValidLat = lat;
                     lastValidLng = lng;
                     
@@ -419,7 +408,7 @@
             }
         }
 
-        // Live Synchronizer Stream
+        // Synchronize interface modifications live
         function listenToGroupRealtimeChanges() {
             if (!currentGroupId) return;
 
@@ -440,6 +429,7 @@
                 let activeNodes = 0;
                 let totalBreaches = 0;
                 let totalAlerts = 0;
+                activeEmergencyUserIds = [];
 
                 Object.keys(members).forEach(userId => {
                     const data = members[userId];
@@ -450,11 +440,14 @@
                     const hasBreachedGeofence = !isInsideSafeZone;
 
                     if (hasBreachedGeofence) totalBreaches++;
-                    if (data.isEmergency) totalAlerts++;
+                    if (data.isEmergency) {
+                        totalAlerts++;
+                        activeEmergencyUserIds.push(userId);
+                    }
 
                     if (data.isEmergency || hasBreachedGeofence) {
                         groupAlertTriggered = true;
-                        compositeAlertMsg = (data.name || 'User').toUpperCase() + (data.isEmergency ? " [SOS]" : " [BREACH]");
+                        compositeAlertMsg = (data.name || 'Someone').toUpperCase() + (data.isEmergency ? " [SOS ALARM]" : " [LEFT AREA]");
                     }
 
                     const li = document.createElement('li');
@@ -466,7 +459,7 @@
                         <div class="flex items-center justify-between">
                             <span>${data.name || 'Unknown'} ${userId === currentUserId ? '(You)' : ''}</span>
                             <span class="text-[9px] font-mono tracking-wider px-1.5 py-0.5 rounded uppercase bg-black/20">${
-                                data.isEmergency ? 'SOS' : hasBreachedGeofence ? 'BREACH' : 'OK'
+                                data.isEmergency ? 'SOS' : hasBreachedGeofence ? 'OUTSIDE' : 'OK'
                             }</span>
                         </div>
                     `;
@@ -505,6 +498,14 @@
                 if (groupAlertTriggered) {
                     if (emergencyMsg) emergencyMsg.innerText = compositeAlertMsg;
                     if (emergencyBanner) emergencyBanner.classList.remove('hidden');
+                    
+                    // Permission Check: Show "Turn Off Alarm" button if user is Group Head OR the sender of the SOS
+                    if (isGroupCreator || activeEmergencyUserIds.includes(currentUserId)) {
+                        dismissEmergencyBtn.classList.remove('hidden');
+                    } else {
+                        dismissEmergencyBtn.classList.add('hidden');
+                    }
+                    
                     playSynthesizedAlarmTone();
                 } else {
                     if (emergencyBanner) emergencyBanner.classList.add('hidden');
@@ -520,7 +521,7 @@
         document.getElementById('btn-logout').addEventListener('click', handleLogoutAndClear);
         document.getElementById('btn-hard-reset').addEventListener('click', handleLogoutAndClear);
 
-        // Hardware Bluetooth Sync Feature
+        // Hardware pairing module
         document.getElementById('btn-ble-connect').addEventListener('click', async () => {
             try {
                 const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'GeoGuard_Button' }], optionalServices: [BLE_SERVICE_UUID] });
@@ -532,14 +533,25 @@
                     const value = event.target.value.getUint8(0);
                     if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), value === 1);
                 });
-            } catch (error) { console.error("Bluetooth device connection issue:", error); }
+            } catch (error) { console.error(error); }
         });
 
         document.getElementById('btn-panic').addEventListener('click', () => {
             if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), true);
         });
+        
         document.getElementById('dismiss-emergency').addEventListener('click', () => {
-            if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), false);
+            if (!currentGroupId) return;
+            
+            if (isGroupCreator) {
+                // Head/creator can turn off ALL active alarms in the group
+                activeEmergencyUserIds.forEach(id => {
+                    set(ref(db, `groups/${currentGroupId}/members/${id}/isEmergency`), false);
+                });
+            } else if (activeEmergencyUserIds.includes(currentUserId)) {
+                // Regular person can turn off their own alarm
+                set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), false);
+            }
         });
     </script>
 </body>
