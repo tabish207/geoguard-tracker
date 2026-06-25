@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GeoGuard Live Terminal</title>
+    <title>GeoGuard Tracker</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
@@ -13,60 +13,59 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #020617; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #0f172a; }
         #map { width: 100%; height: 100%; background: #1e293b; }
         .leaflet-container { font-family: ui-sans-serif, system-ui, sans-serif; }
-        /* High-Visibility Custom Layout Overrides */
         .leaflet-draw-toolbar a { background-color: #1e293b !important; border-bottom: 1px solid #334155 !important; color: #f8fafc !important; }
         .leaflet-draw-toolbar a:hover { background-color: #334155 !important; }
     </style>
 </head>
-<body class="text-slate-200 selection:bg-blue-500 selection:text-white">
+<body class="text-slate-200">
 
-    <div id="emergency-banner" class="hidden fixed top-0 left-0 right-0 bg-red-600 text-white z-[10000] shadow-2xl px-6 py-4 animate-pulse flex items-center justify-between border-b border-red-700">
+    <div id="emergency-banner" class="hidden fixed top-0 left-0 right-0 bg-red-600 text-white z-[10000] shadow-xl px-6 py-4 animate-pulse flex items-center justify-between border-b border-red-700">
         <div class="flex items-center gap-3">
             <span class="flex h-3 w-3 relative">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
             </span>
-            <p class="text-xs font-black tracking-widest uppercase">CRITICAL TELEMETRY ALERT: <span id="emergency-msg" class="font-mono ml-1"></span></p>
+            <p class="text-xs font-bold tracking-wider uppercase">EMERGENCY ALERT: <span id="emergency-msg" class="font-mono ml-1"></span></p>
         </div>
-        <button id="dismiss-emergency" class="bg-black/30 hover:bg-black/50 text-white font-mono text-[10px] uppercase px-4 py-1.5 rounded-lg tracking-wider transition-all border border-white/10">
-            Acknowledge & Mute
+        <button id="dismiss-emergency" class="bg-black/20 hover:bg-black/40 text-white font-sans text-xs uppercase px-4 py-1.5 rounded-lg transition-all border border-white/20">
+            Dismiss Alarm
         </button>
     </div>
 
     <div id="setup-panel" class="absolute inset-0 z-[9999] flex items-center justify-center bg-slate-950 p-4">
         <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-5">
             <div class="text-center">
-                <h1 class="text-xl font-black tracking-tight text-white uppercase">GeoGuard Live</h1>
-                <p class="text-slate-400 text-xs mt-1">Tactical Geofencing & Operational Node Hub</p>
+                <h1 class="text-xl font-bold text-white uppercase tracking-wide">GeoGuard Tracker</h1>
+                <p class="text-slate-400 text-xs mt-1">Live Location & Geofencing Dashboard</p>
             </div>
 
             <div class="space-y-2">
-                <label class="text-[10px] font-bold tracking-widest uppercase text-slate-400">Operator Identity Handle</label>
-                <input type="text" id="username" placeholder="e.g., Alpha_Station" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all text-white font-medium" />
+                <label class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Your Name</label>
+                <input type="text" id="username" placeholder="Enter your name" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all text-white font-medium" />
             </div>
 
             <div class="grid grid-cols-2 gap-3 mt-2">
-                <button id="btn-create-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl tracking-wider border border-slate-700 transition-all">Create Grid</button>
-                <button id="btn-join-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl tracking-wider border border-slate-700 transition-all">Join Grid</button>
+                <button id="btn-create-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl border border-slate-700 transition-all">Create Group</button>
+                <button id="btn-join-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl border border-slate-700 transition-all">Join Group</button>
             </div>
 
             <div id="create-group-box" class="hidden space-y-3 pt-2 border-t border-slate-800/60">
                 <div class="space-y-2">
-                    <label class="text-[10px] font-bold tracking-widest uppercase text-slate-400">Target Perimeter Name</label>
-                    <input type="text" id="group-name" placeholder="Sector 4 Surveillance" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all text-white" />
+                    <label class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Group Name</label>
+                    <input type="text" id="group-name" placeholder="e.g., Team Alpha" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all text-white" />
                 </div>
-                <button id="btn-submit-create" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase py-3 rounded-xl tracking-wider shadow-lg shadow-blue-600/20 transition-all">Initialize Sector</button>
+                <button id="btn-submit-create" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase py-3 rounded-xl tracking-wider transition-all">Create and Start</button>
             </div>
 
             <div id="join-group-box" class="hidden space-y-3 pt-2 border-t border-slate-800/60">
                 <div class="space-y-2">
-                    <label class="text-[10px] font-bold tracking-widest uppercase text-slate-400">Sector Access Identifier Token</label>
-                    <input type="text" id="target-group-id" placeholder="Paste exact unique token key" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-blue-500 transition-all text-white" />
+                    <label class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Group ID Token</label>
+                    <input type="text" id="target-group-id" placeholder="Paste Group ID here" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-blue-500 transition-all text-white" />
                 </div>
-                <button id="btn-submit-join" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase py-3 rounded-xl tracking-wider shadow-lg shadow-emerald-600/20 transition-all">Connect Grid Matrix</button>
+                <button id="btn-submit-join" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase py-3 rounded-xl tracking-wider transition-all">Join Group</button>
             </div>
         </div>
     </div>
@@ -75,32 +74,32 @@
         
         <div class="w-80 bg-slate-950 border-r border-slate-900 flex flex-col justify-between z-[500] shrink-0 shadow-2xl">
             
-            <div class="p-4 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+            <div class="p-4 space-y-5 overflow-y-auto flex-1">
                 <div class="flex items-center justify-between border-b border-slate-900 pb-3">
                     <div>
-                        <h2 id="display-group-name" class="font-black text-white text-sm tracking-wide truncate max-w-[180px]">Active Session</h2>
-                        <p class="text-[10px] font-mono text-slate-500 mt-0.5 tracking-wider">KEY: <span id="display-group-id" class="select-all cursor-pointer hover:text-blue-400">---</span></p>
+                        <h2 id="display-group-name" class="font-bold text-white text-sm truncate max-w-[180px]">Active Group</h2>
+                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">ID: <span id="display-group-id" class="select-all cursor-pointer hover:text-blue-400">---</span></p>
                     </div>
-                    <button id="btn-logout" class="text-slate-500 hover:text-red-400 text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded bg-slate-900 border border-slate-800 transition-all">Exit</button>
+                    <button id="btn-logout" class="text-slate-400 hover:text-red-400 text-[10px] uppercase font-bold px-2.5 py-1 rounded bg-slate-900 border border-slate-800 transition-all">Log Out</button>
                 </div>
 
                 <div class="grid grid-cols-3 gap-2 text-center">
                     <div class="bg-slate-900/50 border border-slate-900 p-2 rounded-xl">
-                        <div class="text-[9px] font-bold text-slate-500 tracking-widest uppercase">Total</div>
-                        <div id="cnt-total" class="text-base font-black text-white mt-0.5">0</div>
+                        <div class="text-[9px] font-bold text-slate-500 uppercase">Users</div>
+                        <div id="cnt-total" class="text-base font-bold text-white mt-0.5">0</div>
                     </div>
                     <div class="bg-slate-900/50 border border-slate-900 p-2 rounded-xl">
-                        <div class="text-[9px] font-bold text-amber-500/80 tracking-widest uppercase">Breach</div>
-                        <div id="cnt-breach" class="text-base font-black text-amber-500 mt-0.5">0</div>
+                        <div class="text-[9px] font-bold text-amber-500/80 uppercase">Breaches</div>
+                        <div id="cnt-breach" class="text-base font-bold text-amber-500 mt-0.5">0</div>
                     </div>
                     <div class="bg-slate-900/50 border border-slate-900 p-2 rounded-xl">
-                        <div class="text-[9px] font-bold text-red-500/80 tracking-widest uppercase">SOS</div>
-                        <div id="cnt-alert" class="text-base font-black text-red-500 mt-0.5">0</div>
+                        <div class="text-[9px] font-bold text-red-500/80 uppercase">SOS</div>
+                        <div id="cnt-alert" class="text-base font-bold text-red-500 mt-0.5">0</div>
                     </div>
                 </div>
 
                 <div class="space-y-2">
-                    <h3 class="text-[10px] font-black tracking-widest text-slate-400 uppercase">Operator Grid Diagnostics</h3>
+                    <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Group Members</h3>
                     <ul id="member-list" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
                         </ul>
                 </div>
@@ -108,12 +107,12 @@
 
             <div class="p-4 border-t border-slate-900 bg-slate-950/80 space-y-2 shrink-0">
                 <button id="btn-ble-connect" class="w-full bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 font-bold text-[11px] uppercase py-3 px-4 rounded-xl tracking-wider transition-all flex items-center justify-center gap-2">
-                    <span class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span> Connect Hardware Component
+                    <span class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span> Connect Emergency Button
                 </button>
-                <button id="btn-panic" class="w-full bg-red-600 hover:bg-red-700 text-white font-black text-[11px] uppercase py-3 rounded-xl tracking-widest shadow-lg shadow-red-600/10 transition-all">
-                    Trigger Local SOS Panic
+                <button id="btn-panic" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] uppercase py-3 rounded-xl tracking-wider transition-all">
+                    Trigger Panic Alarm
                 </button>
-                <button id="btn-hard-reset" class="w-full text-slate-600 hover:text-slate-400 text-[9px] font-mono uppercase tracking-widest text-center block pt-1">Hard Master System Wipe</button>
+                <button id="btn-hard-reset" class="w-full text-slate-600 hover:text-slate-400 text-[9px] font-mono uppercase tracking-widest text-center block pt-1">Reset Application</button>
             </div>
         </div>
 
@@ -128,7 +127,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // Operational Firebase Web Configurations
         const firebaseConfig = {
             apiKey: "AIzaSyCsW2XrO_oBpeTWOlFJKa54bLVlp_ZODtU",
             authDomain: "tabish-s-webapp.firebaseapp.com",
@@ -143,7 +141,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // 1. Core State Initialization Sequence
+        // Core App Variables Setup
         let currentGroupId = localStorage.getItem('geo_group_id') || null;
         let currentUserId = localStorage.getItem('geo_user_id') || ('user_' + Math.random().toString(36).substring(2, 9));
         let currentUsername = localStorage.getItem('geo_username') || "";
@@ -155,6 +153,7 @@
         let mapPolylines = {}; 
         let activeGeofencePolygon = null; 
 
+        // CRITICAL FIX: These variables are declared exactly ONCE here at the top.
         let lastValidLat = null;
         let lastValidLng = null;
         const MIN_MOVEMENT_THRESHOLD = 0.0001; 
@@ -168,10 +167,9 @@
         const emergencyBanner = document.getElementById('emergency-banner');
         const emergencyMsg = document.getElementById('emergency-msg');
 
-        // 2. Safe Structural Key Binding Declaration
         const STORAGE_KEY = `geoguard_offline_buffer_${currentUserId}`;
 
-        // Synthesized Core Audio Engine Layer (Web Audio API)
+        // In-Browser Audio Alarm Setup (Web Audio API)
         let audioCtx = null;
         let alarmIntervalId = null;
 
@@ -188,7 +186,7 @@
                 let gain = audioCtx.createGain();
                 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitched clean tactical alert beep
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime); // Standard beep tone
                 
                 gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
@@ -231,7 +229,7 @@
 
         window.addEventListener('online', flushOfflineBuffer);
 
-        // Service Worker Management Framework
+        // Service Worker Management
         if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js', { scope: './' })
@@ -240,7 +238,7 @@
             });
         }
 
-        // Session Recovery Diagnostics Logic
+        // Automatic Session Recovery Handling
         if (currentGroupId && currentUsername) {
             if (setupPanel) setupPanel.classList.add('hidden');
             if (trackingPanel) trackingPanel.classList.remove('hidden');
@@ -249,10 +247,10 @@
             unlockOverlay.id = 'audio-unlock-shutter';
             unlockOverlay.className = 'fixed inset-0 bg-slate-950/95 z-[99999] flex flex-col items-center justify-center p-6 text-center gap-4';
             unlockOverlay.innerHTML = `
-                <h3 class="text-white font-bold text-lg tracking-wide uppercase">Telemetry Node Recovered</h3>
-                <p class="text-slate-400 text-xs max-w-xs leading-relaxed">System requires an interface confirmation check to arm local audio warning engines.</p>
-                <button id="btn-audio-activate" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase px-6 py-3 rounded-xl tracking-wider shadow-lg transition-all mt-2">
-                    Arm Terminal Audio
+                <h3 class="text-white font-bold text-lg uppercase tracking-wide">Session Found</h3>
+                <p class="text-slate-400 text-xs max-w-xs leading-relaxed">Please click below to activate the map and turn on warning sounds.</p>
+                <button id="btn-audio-activate" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase px-6 py-3 rounded-xl tracking-wider transition-all mt-2">
+                    Activate Terminal
                 </button>
             `;
             document.body.appendChild(unlockOverlay);
@@ -282,7 +280,7 @@
             }
         }
 
-        // Interface Toggles
+        // Panel Setup Screen Buttons Click Handlers
         document.getElementById('btn-create-mode').addEventListener('click', () => {
             document.getElementById('create-group-box').classList.remove('hidden');
             document.getElementById('join-group-box').classList.add('hidden');
@@ -296,7 +294,7 @@
         document.getElementById('btn-submit-create').addEventListener('click', () => {
             currentUsername = usernameInput.value.trim();
             const groupName = document.getElementById('group-name').value.trim();
-            if(!currentUsername || !groupName) return alert("Verify core input requirements.");
+            if(!currentUsername || !groupName) return alert("Please fill in all fields.");
 
             const groupsRef = ref(db, 'groups');
             const newGroupRef = push(groupsRef);
@@ -310,7 +308,7 @@
         document.getElementById('btn-submit-join').addEventListener('click', () => {
             currentUsername = usernameInput.value.trim();
             currentGroupId = document.getElementById('target-group-id').value.trim();
-            if(!currentUsername || !currentGroupId) return alert("Verify core input requirements.");
+            if(!currentUsername || !currentGroupId) return alert("Please fill in all fields.");
             commitSessionToStorage(currentGroupId, currentUsername);
         });
 
@@ -332,7 +330,7 @@
             });
         }
 
-        // 3. Mapping System Infrastructure Layout
+        // Setup Leaflet Map Container
         function initiateMappingSystem() {
             try {
                 if (map !== null) { map.remove(); map = null; }
@@ -370,7 +368,7 @@
 
                 map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
                 map.invalidateSize();
-            } catch (err) { console.error("Map load error:", err); }
+            } catch (err) { console.error("Map initialization failed:", err); }
         }
 
         function isPointInPolygon(lat, lng, polygon) {
@@ -395,7 +393,7 @@
                     const lng = position.coords.longitude;
                     const accuracy = position.coords.accuracy;
 
-                    if (accuracy > 30) return; // Drop bad telemetry drift points
+                    if (accuracy > 30) return; // Skip inaccurate values
 
                     if (lastValidLat !== null && lastValidLng !== null) {
                         const latDelta = Math.abs(lat - lastValidLat);
@@ -403,6 +401,7 @@
                         if (latDelta < MIN_MOVEMENT_THRESHOLD && lngDelta < MIN_MOVEMENT_THRESHOLD) return;
                     }
 
+                    // CRITICAL OPERATION: Update variables without redeclaring 'let'
                     lastValidLat = lat;
                     lastValidLng = lng;
                     
@@ -420,13 +419,13 @@
             }
         }
 
-        // 4. Real-time Database Cluster Sync Streams
+        // Live Synchronizer Stream
         function listenToGroupRealtimeChanges() {
             if (!currentGroupId) return;
 
             onValue(ref(db, `groups/${currentGroupId}/groupName`), (snapshot) => {
                 const nameNode = document.getElementById('display-group-name');
-                if(nameNode) nameNode.innerText = snapshot.val() || "Active Session";
+                if(nameNode) nameNode.innerText = snapshot.val() || "Active Group";
                 document.getElementById('display-group-id').innerText = currentGroupId;
             });
 
@@ -455,7 +454,7 @@
 
                     if (data.isEmergency || hasBreachedGeofence) {
                         groupAlertTriggered = true;
-                        compositeAlertMsg = (data.name || 'Operator').toUpperCase() + (data.isEmergency ? " [SOS]" : " [BREACH]");
+                        compositeAlertMsg = (data.name || 'User').toUpperCase() + (data.isEmergency ? " [SOS]" : " [BREACH]");
                     }
 
                     const li = document.createElement('li');
@@ -466,7 +465,7 @@
                     li.innerHTML = `
                         <div class="flex items-center justify-between">
                             <span>${data.name || 'Unknown'} ${userId === currentUserId ? '(You)' : ''}</span>
-                            <span class="text-[9px] font-mono tracking-widest px-1.5 py-0.5 rounded uppercase bg-black/20">${
+                            <span class="text-[9px] font-mono tracking-wider px-1.5 py-0.5 rounded uppercase bg-black/20">${
                                 data.isEmergency ? 'SOS' : hasBreachedGeofence ? 'BREACH' : 'OK'
                             }</span>
                         </div>
@@ -521,7 +520,7 @@
         document.getElementById('btn-logout').addEventListener('click', handleLogoutAndClear);
         document.getElementById('btn-hard-reset').addEventListener('click', handleLogoutAndClear);
 
-        // Web Bluetooth GATT Core Streams
+        // Hardware Bluetooth Sync Feature
         document.getElementById('btn-ble-connect').addEventListener('click', async () => {
             try {
                 const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'GeoGuard_Button' }], optionalServices: [BLE_SERVICE_UUID] });
@@ -533,7 +532,7 @@
                     const value = event.target.value.getUint8(0);
                     if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), value === 1);
                 });
-            } catch (error) { console.error("Hardware BLE Sync Fault:", error); }
+            } catch (error) { console.error("Bluetooth device connection issue:", error); }
         });
 
         document.getElementById('btn-panic').addEventListener('click', () => {
