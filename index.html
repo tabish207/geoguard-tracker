@@ -131,7 +131,7 @@
 
     <audio id="siren-audio" src="https://assets.mixkit.co/active_storage/sfx/1001/1001-84.wav" loop prefetch="auto"></audio>
 
-    <script type="module">
+<script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
@@ -149,17 +149,49 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
+        // 1. FIRST: Core Session Declarations
         let currentGroupId = localStorage.getItem('geo_group_id') || null;
         let currentUserId = localStorage.getItem('geo_user_id') || ('user_' + Math.random().toString(36).substring(2, 9));
         let currentUsername = localStorage.getItem('geo_username') || "";
         localStorage.setItem('geo_user_id', currentUserId);
 
+        // 2. SECOND: Map Interface State References
         let map = null;
         let wakeLock = null;
         let mapMarkers = {};
         let mapPolylines = {}; 
         let activeGeofencePolygon = null; 
 
+        // GPS Drift baseline memory
+        let lastValidLat = null;
+        let lastValidLng = null;
+        const MIN_MOVEMENT_THRESHOLD = 0.0001; 
+
+        const BLE_SERVICE_UUID = "4fa4c201-1fb2-45fe-a28a-75dec6c0e453";
+        const BLE_CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+        const setupPanel = document.getElementById('setup-panel');
+        const trackingPanel = document.getElementById('tracking-panel');
+        const usernameInput = document.getElementById('username');
+        const emergencyBanner = document.getElementById('emergency-banner');
+        const emergencyMsg = document.getElementById('emergency-msg');
+        const siren = document.getElementById('siren-audio');
+
+        // 3. THIRD: Resilient Offline Queue Configuration (Now safely using currentUserId!)
+        const STORAGE_KEY = `geoguard_offline_buffer_${currentUserId}`;
+
+        function bufferLocationOffline(lat, lng) {
+            try {
+                let buffer = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+                buffer.push({ lat: lat, lng: lng, timestamp: Date.now() });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(buffer));
+                console.warn(`[Offline] Saved snapshot locally. Queue size: ${buffer.length}`);
+            } catch (e) {
+                console.error("Local queue crash:", e);
+            }
+        }
+        
+        // ... Keep the rest of your code exactly the same below this line ...
         // GPS Drift baseline memory
         let lastValidLat = null;
         let lastValidLng = null;
