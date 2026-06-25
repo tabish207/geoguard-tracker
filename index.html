@@ -20,6 +20,7 @@
 </head>
 <body class="text-slate-200">
 
+    <!-- Emergency Warning Banner -->
     <div id="emergency-banner" class="hidden fixed top-0 left-0 right-0 bg-red-600 text-white z-[10000] shadow-xl px-6 py-4 animate-pulse flex items-center justify-between border-b border-red-700">
         <div class="flex items-center gap-3">
             <span class="flex h-3 w-3 relative">
@@ -33,6 +34,7 @@
         </button>
     </div>
 
+    <!-- Screen 1: Login / Group Setup Panel -->
     <div id="setup-panel" class="absolute inset-0 z-[9999] flex items-center justify-center bg-slate-950 p-4">
         <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-5">
             <div class="text-center">
@@ -50,6 +52,7 @@
                 <button id="btn-join-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl border border-slate-700 transition-all">Join a Group</button>
             </div>
 
+            <!-- Create Group Input Box -->
             <div id="create-group-box" class="hidden space-y-3 pt-2 border-t border-slate-800/60">
                 <div class="space-y-2">
                     <label class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Group Name</label>
@@ -58,6 +61,7 @@
                 <button id="btn-submit-create" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase py-3 rounded-xl tracking-wider transition-all">Create and Start</button>
             </div>
 
+            <!-- Join Group Input Box -->
             <div id="join-group-box" class="hidden space-y-3 pt-2 border-t border-slate-800/60">
                 <div class="space-y-2">
                     <label class="text-[10px] font-bold tracking-wider uppercase text-slate-400">Group Invite Code</label>
@@ -68,8 +72,10 @@
         </div>
     </div>
 
+    <!-- Screen 2: Main Dashboard Tracking View -->
     <div id="tracking-panel" class="hidden absolute inset-0 flex">
         
+        <!-- Left Sidebar Panel -->
         <div class="w-80 bg-slate-950 border-r border-slate-900 flex flex-col justify-between z-[500] shrink-0 shadow-2xl">
             
             <div class="p-4 space-y-5 overflow-y-auto flex-1">
@@ -81,6 +87,7 @@
                     <button id="btn-logout" class="text-slate-400 hover:text-red-400 text-[10px] uppercase font-bold px-2.5 py-1 rounded bg-slate-900 border border-slate-800 transition-all">Leave</button>
                 </div>
 
+                <!-- Status Counters -->
                 <div class="grid grid-cols-3 gap-2 text-center">
                     <div class="bg-slate-900/50 border border-slate-900 p-2 rounded-xl">
                         <div class="text-[9px] font-bold text-slate-500 uppercase">People</div>
@@ -96,13 +103,16 @@
                     </div>
                 </div>
 
+                <!-- Active Group Roster List -->
                 <div class="space-y-2">
                     <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Group Members</h3>
                     <ul id="member-list" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
-                        </ul>
+                        <!-- Filled dynamically -->
+                    </ul>
                 </div>
             </div>
 
+            <!-- Emergency Controls Bottom Layout -->
             <div class="p-4 border-t border-slate-900 bg-slate-950/80 space-y-2 shrink-0">
                 <button id="btn-ble-connect" class="w-full bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 font-bold text-[11px] uppercase py-3 px-4 rounded-xl tracking-wider transition-all flex items-center justify-center gap-2">
                     <span class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span> Pair Emergency Button Hardware
@@ -114,11 +124,13 @@
             </div>
         </div>
 
+        <!-- Main Map Area Viewport -->
         <div class="flex-1 relative bg-slate-900">
             <div id="map"></div>
         </div>
     </div>
 
+    <!-- Web Audio Node Placeholder Engine -->
     <div id="radar-audio-engine" data-active="false"></div>
 
     <script type="module">
@@ -376,6 +388,19 @@
 
         function startLiveGeolocationTracking() {
             if ("geolocation" in navigator) {
+                // FORCE an instant high-accuracy lookup immediately on start
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    lastValidLat = lat;
+                    lastValidLng = lng;
+                    if(currentGroupId) {
+                        set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lat`), lat);
+                        set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lng`), lng);
+                    }
+                }, (error) => console.error("Initial GPS grab failed:", error), { enableHighAccuracy: true });
+
+                // Keep watching continuously
                 navigator.geolocation.watchPosition((position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
@@ -430,23 +455,34 @@
 
                 Object.keys(members).forEach(userId => {
                     const data = members[userId];
-                    if(!data || (data.lat === 0 && data.lng === 0)) return;
+                    if(!data) return;
 
                     activeNodes++;
-                    const isInsideSafeZone = isPointInPolygon(data.lat, data.lng, activeGeofencePolygon);
-                    const hasBreachedGeofence = !isInsideSafeZone;
-
-                    if (hasBreachedGeofence) totalBreaches++;
+                    
+                    // Track alerts immediately (even if map position hasn't updated yet)
                     if (data.isEmergency) {
                         totalAlerts++;
                         activeEmergencyUserIds.push(userId);
-                    }
-
-                    if (data.isEmergency || hasBreachedGeofence) {
                         groupAlertTriggered = true;
-                        compositeAlertMsg = (data.name || 'Someone').toUpperCase() + (data.isEmergency ? " [SOS ALARM]" : " [LEFT AREA]");
+                        compositeAlertMsg = (data.name || 'Someone').toUpperCase() + " [SOS ALARM]";
                     }
 
+                    const hasValidCoords = (data.lat !== undefined && data.lng !== undefined && data.lat !== 0 && data.lng !== 0);
+                    let hasBreachedGeofence = false;
+
+                    if (hasValidCoords) {
+                        const isInsideSafeZone = isPointInPolygon(data.lat, data.lng, activeGeofencePolygon);
+                        hasBreachedGeofence = !isInsideSafeZone;
+                        if (hasBreachedGeofence) {
+                            totalBreaches++;
+                            groupAlertTriggered = true;
+                            if (!data.isEmergency) {
+                                compositeAlertMsg = (data.name || 'Someone').toUpperCase() + " [LEFT AREA]";
+                            }
+                        }
+                    }
+
+                    // Update left panel text list
                     const li = document.createElement('li');
                     li.className = `p-3 rounded-xl border flex flex-col gap-1 text-xs ${
                         data.isEmergency ? 'bg-red-500 text-white border-red-600 font-bold' : hasBreachedGeofence ? 'bg-amber-500 text-slate-900 border-amber-600 font-semibold' : 'bg-slate-800 text-slate-100 border-slate-700'
@@ -456,34 +492,35 @@
                         <div class="flex items-center justify-between">
                             <span>${data.name || 'Unknown'} ${userId === currentUserId ? '(You)' : ''}</span>
                             <span class="text-[9px] font-mono tracking-wider px-1.5 py-0.5 rounded uppercase bg-black/20">${
-                                data.isEmergency ? 'SOS' : hasBreachedGeofence ? 'OUTSIDE' : 'OK'
+                                data.isEmergency ? 'SOS' : hasBreachedGeofence ? 'OUTSIDE' : hasValidCoords ? 'OK' : 'WAITING FOR GPS'
                             }</span>
                         </div>
                     `;
                     rosterList.appendChild(li);
 
-                    const markerColor = data.isEmergency ? 'red' : hasBreachedGeofence ? 'orange' : 'blue';
-                    const targetIcon = L.icon({
-                        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColor}.png`,
-                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-                    });
+                    // Render marker on the map ONLY if coords are valid
+                    if (hasValidCoords && map) {
+                        const markerColor = data.isEmergency ? 'red' : hasBreachedGeofence ? 'orange' : 'blue';
+                        const targetIcon = L.icon({
+                            iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColor}.png`,
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+                        });
 
-                    if (map) {
                         if (mapMarkers[userId]) {
                             mapMarkers[userId].setLatLng([data.lat, data.lng]);
                             mapMarkers[userId].setIcon(targetIcon);
                         } else {
                             mapMarkers[userId] = L.marker([data.lat, data.lng], { icon: targetIcon }).addTo(map);
                         }
-                    }
 
-                    if (data.history && map) {
-                        const trailPoints = Object.keys(data.history).map(key => [data.history[key].lat, data.history[key].lng]);
-                        if (mapPolylines[userId]) {
-                            mapPolylines[userId].setLatLngs(trailPoints);
-                        } else {
-                            mapPolylines[userId] = L.polyline(trailPoints, { color: userId === currentUserId ? '#2563eb' : '#16a34a', weight: 4, opacity: 0.85 }).addTo(map);
+                        if (data.history) {
+                            const trailPoints = Object.keys(data.history).map(key => [data.history[key].lat, data.history[key].lng]);
+                            if (mapPolylines[userId]) {
+                                mapPolylines[userId].setLatLngs(trailPoints);
+                            } else {
+                                mapPolylines[userId] = L.polyline(trailPoints, { color: userId === currentUserId ? '#2563eb' : '#16a34a', weight: 4, opacity: 0.85 }).addTo(map);
+                            }
                         }
                     }
                 });
@@ -517,7 +554,7 @@
         document.getElementById('btn-logout').addEventListener('click', handleLogoutAndClear);
         document.getElementById('btn-hard-reset').addEventListener('click', handleLogoutAndClear);
 
-        // Hardware pairing module (Works for everyone including group creator/owner)
+        // Hardware pairing module
         document.getElementById('btn-ble-connect').addEventListener('click', async () => {
             try {
                 const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'GeoGuard_Button' }], optionalServices: [BLE_SERVICE_UUID] });
