@@ -2,139 +2,133 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoGuard Terminal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GeoGuard Live Terminal</title>
     
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for (var i = 0; i < registrations.length; i++) {
-                    registrations[i].unregister();
-                }
-            });
-        }
-        if ('caches' in window) {
-            caches.keys().then(function(keys) {
-                keys.forEach(function(key) { caches.delete(key); });
-            });
-        }
-    </script>
-
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
-        #map { background: #cbd5e1 !important; }
-        .leaflet-draw-toolbar a { background-color: #ffffff !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
-        .leaflet-draw-actions a { background-color: #334155 !important; color: #ffffff !important; }
-        .custom-popup .leaflet-popup-content-wrapper { background: #1e293b; color: #f8fafc; border-radius: 12px; padding: 4px; }
-        .custom-popup .leaflet-popup-tip { background: #1e293b; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #020617; }
+        #map { width: 100%; height: 100%; background: #1e293b; }
+        .leaflet-container { font-family: ui-sans-serif, system-ui, sans-serif; }
+        /* High-Visibility Custom Layout Overrides */
+        .leaflet-draw-toolbar a { background-color: #1e293b !important; border-bottom: 1px solid #334155 !important; color: #f8fafc !important; }
+        .leaflet-draw-toolbar a:hover { background-color: #334155 !important; }
     </style>
 </head>
-<body class="bg-[#f1f5f9] text-[#0f172a] min-h-screen flex flex-col antialiased m-0 p-0">
+<body class="text-slate-200 selection:bg-blue-500 selection:text-white">
 
-    <div id="emergency-banner" class="hidden bg-gradient-to-r from-red-600 to-rose-700 text-white text-center py-3 font-bold text-sm tracking-wide uppercase shadow-lg sticky top-0 z-[9999] border-b border-red-700">
-        <span class="inline-flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
-            ALERT TRIGGERED: <span id="emergency-msg" class="underline decoration-2">System Broadcast Active</span>
-        </span>
-        <button id="dismiss-emergency" class="ml-6 bg-white text-red-700 px-4 py-1 rounded-md text-xs font-bold shadow hover:bg-slate-100 transition-all">Clear Threat State</button>
+    <div id="emergency-banner" class="hidden fixed top-0 left-0 right-0 bg-red-600 text-white z-[10000] shadow-2xl px-6 py-4 animate-pulse flex items-center justify-between border-b border-red-700">
+        <div class="flex items-center gap-3">
+            <span class="flex h-3 w-3 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+            </span>
+            <p class="text-xs font-black tracking-widest uppercase">CRITICAL TELEMETRY ALERT: <span id="emergency-msg" class="font-mono ml-1"></span></p>
+        </div>
+        <button id="dismiss-emergency" class="bg-black/30 hover:bg-black/50 text-white font-mono text-[10px] uppercase px-4 py-1.5 rounded-lg tracking-wider transition-all border border-white/10">
+            Acknowledge & Mute
+        </button>
     </div>
 
-    <main id="setup-panel" class="p-6 flex-1 flex flex-col justify-center max-w-md mx-auto w-full gap-6 my-auto">
-        <div class="text-center space-y-1">
-            <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">GEOGUARD LIVE</h1>
-            <p class="text-sm text-slate-500 font-medium">Precision Management Interface & Telemetry Hub</p>
+    <div id="setup-panel" class="absolute inset-0 z-[9999] flex items-center justify-center bg-slate-950 p-4">
+        <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-5">
+            <div class="text-center">
+                <h1 class="text-xl font-black tracking-tight text-white uppercase">GeoGuard Live</h1>
+                <p class="text-slate-400 text-xs mt-1">Tactical Geofencing & Operational Node Hub</p>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-[10px] font-bold tracking-widest uppercase text-slate-400">Operator Identity Handle</label>
+                <input type="text" id="username" placeholder="e.g., Alpha_Station" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all text-white font-medium" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mt-2">
+                <button id="btn-create-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl tracking-wider border border-slate-700 transition-all">Create Grid</button>
+                <button id="btn-join-mode" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase py-3 px-4 rounded-xl tracking-wider border border-slate-700 transition-all">Join Grid</button>
+            </div>
+
+            <div id="create-group-box" class="hidden space-y-3 pt-2 border-t border-slate-800/60">
+                <div class="space-y-2">
+                    <label class="text-[10px] font-bold tracking-widest uppercase text-slate-400">Target Perimeter Name</label>
+                    <input type="text" id="group-name" placeholder="Sector 4 Surveillance" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-all text-white" />
+                </div>
+                <button id="btn-submit-create" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase py-3 rounded-xl tracking-wider shadow-lg shadow-blue-600/20 transition-all">Initialize Sector</button>
+            </div>
+
+            <div id="join-group-box" class="hidden space-y-3 pt-2 border-t border-slate-800/60">
+                <div class="space-y-2">
+                    <label class="text-[10px] font-bold tracking-widest uppercase text-slate-400">Sector Access Identifier Token</label>
+                    <input type="text" id="target-group-id" placeholder="Paste exact unique token key" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-blue-500 transition-all text-white" />
+                </div>
+                <button id="btn-submit-join" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase py-3 rounded-xl tracking-wider shadow-lg shadow-emerald-600/20 transition-all">Connect Grid Matrix</button>
+            </div>
         </div>
+    </div>
 
-        <div class="bg-white border border-slate-200 p-6 rounded-2xl shadow-xl space-y-5">
-            <div class="space-y-1.5">
-                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Operator Designation</label>
-                <input type="text" id="username" placeholder="Type name or callsign..." class="w-full bg-slate-50 border border-slate-300 p-3 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium transition-all">
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <button id="btn-create-mode" class="p-4 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 font-semibold text-sm transition-all">Initiate Group</button>
-                <button id="btn-join-mode" class="p-4 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 font-semibold text-sm transition-all">Join Session</button>
-            </div>
-
-            <div id="create-group-box" class="hidden space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <input type="text" id="group-name" placeholder="Deployment Area Name..." class="w-full bg-white border border-slate-300 p-2.5 rounded-lg text-sm text-slate-900">
-                <button id="btn-submit-create" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-md transition-all">Generate Control Domain</button>
-            </div>
-
-            <div id="join-group-box" class="hidden space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <input type="text" id="target-group-id" placeholder="Paste Session Security Key..." class="w-full bg-white border border-slate-300 p-2.5 rounded-lg text-sm font-mono text-slate-900">
-                <button id="btn-submit-join" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-md transition-all">Connect Stream</button>
-            </div>
+    <div id="tracking-panel" class="hidden absolute inset-0 flex">
+        
+        <div class="w-80 bg-slate-950 border-r border-slate-900 flex flex-col justify-between z-[500] shrink-0 shadow-2xl">
             
-            <button id="btn-hard-reset" class="w-full text-center text-xs text-red-500 hover:underline mt-2">Clear App Session Data</button>
-        </div>
-    </main>
+            <div class="p-4 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+                <div class="flex items-center justify-between border-b border-slate-900 pb-3">
+                    <div>
+                        <h2 id="display-group-name" class="font-black text-white text-sm tracking-wide truncate max-w-[180px]">Active Session</h2>
+                        <p class="text-[10px] font-mono text-slate-500 mt-0.5 tracking-wider">KEY: <span id="display-group-id" class="select-all cursor-pointer hover:text-blue-400">---</span></p>
+                    </div>
+                    <button id="btn-logout" class="text-slate-500 hover:text-red-400 text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded bg-slate-900 border border-slate-800 transition-all">Exit</button>
+                </div>
 
-    <main id="tracking-panel" class="hidden fixed inset-0 w-screen h-screen m-0 p-0 overflow-hidden flex flex-col md:flex-row bg-slate-900">
-        <aside class="w-full md:w-80 bg-slate-900 text-slate-100 flex flex-col h-[40vh] md:h-full shadow-2xl z-20 flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-800">
-            <div class="p-4 border-b border-slate-800 bg-slate-950/40 flex justify-between items-center">
-                <div>
-                    <h2 class="font-bold text-base text-white tracking-wide line-clamp-1" id="display-group-name">Active Session</h2>
-                    <div class="mt-2 bg-slate-900 border border-slate-800 rounded-md p-2 flex items-center justify-between gap-2">
-                        <span class="text-[10px] font-mono text-slate-500 font-bold uppercase">Key:</span>
-                        <span class="text-xs font-mono text-blue-400 font-medium select-all cursor-pointer" id="display-group-id">---</span>
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="bg-slate-900/50 border border-slate-900 p-2 rounded-xl">
+                        <div class="text-[9px] font-bold text-slate-500 tracking-widest uppercase">Total</div>
+                        <div id="cnt-total" class="text-base font-black text-white mt-0.5">0</div>
+                    </div>
+                    <div class="bg-slate-900/50 border border-slate-900 p-2 rounded-xl">
+                        <div class="text-[9px] font-bold text-amber-500/80 tracking-widest uppercase">Breach</div>
+                        <div id="cnt-breach" class="text-base font-black text-amber-500 mt-0.5">0</div>
+                    </div>
+                    <div class="bg-slate-900/50 border border-slate-900 p-2 rounded-xl">
+                        <div class="text-[9px] font-bold text-red-500/80 tracking-widest uppercase">SOS</div>
+                        <div id="cnt-alert" class="text-base font-black text-red-500 mt-0.5">0</div>
                     </div>
                 </div>
-                <button id="btn-logout" class="text-xs bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded border border-slate-700">Exit</button>
-            </div>
 
-            <div class="grid grid-cols-3 gap-1.5 p-3 bg-slate-950/20 border-b border-slate-800 text-center">
-                <div class="bg-slate-800/60 p-2 rounded-xl border border-slate-800">
-                    <p class="text-[10px] text-slate-400 font-semibold uppercase">Total</p>
-                    <p class="text-lg font-bold font-mono text-white mt-0.5" id="cnt-total">0</p>
-                </div>
-                <div class="bg-amber-500/10 p-2 rounded-xl border border-amber-500/20">
-                    <p class="text-[10px] text-amber-400 font-semibold uppercase">Breach</p>
-                    <p class="text-lg font-bold font-mono text-amber-400 mt-0.5" id="cnt-breach">0</p>
-                </div>
-                <div class="bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">
-                    <p class="text-[10px] text-rose-400 font-semibold uppercase">SOS</p>
-                    <p class="text-lg font-bold font-mono text-rose-400 mt-0.5" id="cnt-alert">0</p>
+                <div class="space-y-2">
+                    <h3 class="text-[10px] font-black tracking-widest text-slate-400 uppercase">Operator Grid Diagnostics</h3>
+                    <ul id="member-list" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                        </ul>
                 </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-3 space-y-2">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 px-1">Operator Grid Diagnostics</p>
-                <ul id="member-list" class="space-y-1.5"></ul>
-            </div>
-
-            <div class="p-3 border-t border-slate-800 bg-slate-950/30 flex flex-col gap-2">
-                <button id="btn-ble-connect" class="w-full bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-lg font-bold text-xs tracking-wide transition-all border border-slate-700 uppercase">
-                    Connect Hardware Component
+            <div class="p-4 border-t border-slate-900 bg-slate-950/80 space-y-2 shrink-0">
+                <button id="btn-ble-connect" class="w-full bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 font-bold text-[11px] uppercase py-3 px-4 rounded-xl tracking-wider transition-all flex items-center justify-center gap-2">
+                    <span class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span> Connect Hardware Component
                 </button>
-                <button id="btn-panic" class="w-full bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-bold text-xs tracking-wider shadow-md transition-all uppercase">
+                <button id="btn-panic" class="w-full bg-red-600 hover:bg-red-700 text-white font-black text-[11px] uppercase py-3 rounded-xl tracking-widest shadow-lg shadow-red-600/10 transition-all">
                     Trigger Local SOS Panic
                 </button>
+                <button id="btn-hard-reset" class="w-full text-slate-600 hover:text-slate-400 text-[9px] font-mono uppercase tracking-widest text-center block pt-1">Hard Master System Wipe</button>
             </div>
-        </aside>
+        </div>
 
-        <section id="map-container" class="flex-1 relative h-[60vh] md:h-full w-full bg-slate-200">
-            <div id="map" class="w-full h-full"></div>
-        </section>
-    </main>
+        <div class="flex-1 relative bg-slate-900">
+            <div id="map"></div>
+        </div>
+    </div>
 
-   <audio id="siren-audio" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" loop prefetch="auto"></audio>
+    <div id="radar-audio-engine" data-active="false"></div>
 
-<script type="module">
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
+        // Operational Firebase Web Configurations
         const firebaseConfig = {
             apiKey: "AIzaSyCsW2XrO_oBpeTWOlFJKa54bLVlp_ZODtU",
             authDomain: "tabish-s-webapp.firebaseapp.com",
@@ -149,20 +143,18 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // 1. FIRST: Core Session Declarations
+        // 1. Core State Initialization Sequence
         let currentGroupId = localStorage.getItem('geo_group_id') || null;
         let currentUserId = localStorage.getItem('geo_user_id') || ('user_' + Math.random().toString(36).substring(2, 9));
         let currentUsername = localStorage.getItem('geo_username') || "";
         localStorage.setItem('geo_user_id', currentUserId);
 
-        // 2. SECOND: Map Interface State References
         let map = null;
         let wakeLock = null;
         let mapMarkers = {};
         let mapPolylines = {}; 
         let activeGeofencePolygon = null; 
 
-        // GPS Drift baseline memory
         let lastValidLat = null;
         let lastValidLng = null;
         const MIN_MOVEMENT_THRESHOLD = 0.0001; 
@@ -175,50 +167,55 @@
         const usernameInput = document.getElementById('username');
         const emergencyBanner = document.getElementById('emergency-banner');
         const emergencyMsg = document.getElementById('emergency-msg');
-        const siren = document.getElementById('siren-audio');
 
-        // 3. THIRD: Resilient Offline Queue Configuration (Now safely using currentUserId!)
+        // 2. Safe Structural Key Binding Declaration
         const STORAGE_KEY = `geoguard_offline_buffer_${currentUserId}`;
 
-        function bufferLocationOffline(lat, lng) {
-            try {
-                let buffer = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-                buffer.push({ lat: lat, lng: lng, timestamp: Date.now() });
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(buffer));
-                console.warn(`[Offline] Saved snapshot locally. Queue size: ${buffer.length}`);
-            } catch (e) {
-                console.error("Local queue crash:", e);
+        // Synthesized Core Audio Engine Layer (Web Audio API)
+        let audioCtx = null;
+        let alarmIntervalId = null;
+
+        function playSynthesizedAlarmTone() {
+            const audioEngine = document.getElementById('radar-audio-engine');
+            if (!audioEngine || audioEngine.getAttribute('data-active') === 'true') return;
+            
+            audioEngine.setAttribute('data-active', 'true');
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            alarmIntervalId = setInterval(() => {
+                if (!audioCtx) return;
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitched clean tactical alert beep
+                
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            }, 600); 
+        }
+
+        function stopSynthesizedAlarmTone() {
+            const audioEngine = document.getElementById('radar-audio-engine');
+            if (audioEngine) audioEngine.setAttribute('data-active', 'false');
+            if (alarmIntervalId) {
+                clearInterval(alarmIntervalId);
+                alarmIntervalId = null;
             }
         }
-        
-        // ... Keep the rest of your code exactly the same below this line ...
-        // GPS Drift baseline memory
-        let lastValidLat = null;
-        let lastValidLng = null;
-        const MIN_MOVEMENT_THRESHOLD = 0.0001; // Restricts erratic drift updates (~10-15m variation)
-
-        const BLE_SERVICE_UUID = "4fa4c201-1fb2-45fe-a28a-75dec6c0e453";
-        const BLE_CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-
-        const setupPanel = document.getElementById('setup-panel');
-        const trackingPanel = document.getElementById('tracking-panel');
-        const usernameInput = document.getElementById('username');
-        const emergencyBanner = document.getElementById('emergency-banner');
-        const emergencyMsg = document.getElementById('emergency-msg');
-        const siren = document.getElementById('siren-audio');
-
-        // Resilient Offline Queue Configuration
-        const STORAGE_KEY = `geoguard_offline_buffer_${currentUserId}`;
 
         function bufferLocationOffline(lat, lng) {
             try {
                 let buffer = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
                 buffer.push({ lat: lat, lng: lng, timestamp: Date.now() });
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(buffer));
-                console.warn(`[Offline] Saved snapshot locally. Queue size: ${buffer.length}`);
-            } catch (e) {
-                console.error("Local queue crash:", e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         function flushOfflineBuffer() {
@@ -226,28 +223,24 @@
             try {
                 let buffer = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
                 if (buffer.length === 0) return;
-                
-                console.log(`[Online] Processing telemetry sync engine... Uploading ${buffer.length} logs.`);
                 const historyRef = ref(db, `groups/${currentGroupId}/members/${currentUserId}/history`);
-                
                 buffer.forEach(point => { push(historyRef, point); });
                 localStorage.removeItem(STORAGE_KEY);
-            } catch (e) {
-                console.error("Sync pipeline structural fault:", e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         window.addEventListener('online', flushOfflineBuffer);
 
+        // Service Worker Management Framework
         if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js', { scope: './' })
-                .then(reg => {
-                    if(currentGroupId) syncSessionWithWorker();
-                }).catch(err => console.error(err));
+                .then(reg => { if(currentGroupId) syncSessionWithWorker(); })
+                .catch(err => console.error(err));
             });
         }
 
+        // Session Recovery Diagnostics Logic
         if (currentGroupId && currentUsername) {
             if (setupPanel) setupPanel.classList.add('hidden');
             if (trackingPanel) trackingPanel.classList.remove('hidden');
@@ -265,20 +258,12 @@
             document.body.appendChild(unlockOverlay);
 
             document.getElementById('btn-audio-activate').addEventListener('click', () => {
-                if (siren) {
-                    siren.play().then(() => {
-                        siren.pause();
-                        siren.currentTime = 0;
-                        unlockOverlay.remove();
-                        
-                        requestScreenWakeLock();
-                        initiateMappingSystem();
-                        startLiveGeolocationTracking();
-                        listenToGroupRealtimeChanges();
-                    }).catch(() => {
-                        unlockOverlay.remove();
-                    });
-                }
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                unlockOverlay.remove();
+                requestScreenWakeLock();
+                initiateMappingSystem();
+                startLiveGeolocationTracking();
+                listenToGroupRealtimeChanges();
             });
         }
 
@@ -297,6 +282,7 @@
             }
         }
 
+        // Interface Toggles
         document.getElementById('btn-create-mode').addEventListener('click', () => {
             document.getElementById('create-group-box').classList.remove('hidden');
             document.getElementById('join-group-box').classList.add('hidden');
@@ -332,12 +318,7 @@
             localStorage.setItem('geo_group_id', groupId);
             localStorage.setItem('geo_username', name);
             
-            if (siren) {
-                siren.play().then(() => {
-                    siren.pause();
-                    siren.currentTime = 0;
-                }).catch(e => console.log("Audio priming bypassed:", e));
-            }
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             
             const memberRef = ref(db, `groups/${groupId}/members/${currentUserId}`);
             set(memberRef, { name: name, lat: 0.0, lng: 0.0, isEmergency: false }).then(() => {
@@ -351,6 +332,7 @@
             });
         }
 
+        // 3. Mapping System Infrastructure Layout
         function initiateMappingSystem() {
             try {
                 if (map !== null) { map.remove(); map = null; }
@@ -388,9 +370,7 @@
 
                 map.on(L.Draw.Event.DELETED, function () { activeGeofencePolygon = null; });
                 map.invalidateSize();
-            } catch (err) {
-                console.error("Leaflet core allocation fault:", err);
-            }
+            } catch (err) { console.error("Map load error:", err); }
         }
 
         function isPointInPolygon(lat, lng, polygon) {
@@ -415,19 +395,12 @@
                     const lng = position.coords.longitude;
                     const accuracy = position.coords.accuracy;
 
-                    // 🛑 DRIFT FILTER 1: Skip updates with low precision variances (>30m bounds)
-                    if (accuracy > 30) {
-                        console.warn(`[GPS Filtered] Reading dropped due to low precision bounds (${accuracy}m accuracy).`);
-                        return;
-                    }
+                    if (accuracy > 30) return; // Drop bad telemetry drift points
 
-                    // 🛑 DRIFT FILTER 2: Compare distance shift delta matrices
                     if (lastValidLat !== null && lastValidLng !== null) {
                         const latDelta = Math.abs(lat - lastValidLat);
                         const lngDelta = Math.abs(lng - lastValidLng);
-                        if (latDelta < MIN_MOVEMENT_THRESHOLD && lngDelta < MIN_MOVEMENT_THRESHOLD) {
-                            return; // Suppress coordinate jump anomalies while stationary
-                        }
+                        if (latDelta < MIN_MOVEMENT_THRESHOLD && lngDelta < MIN_MOVEMENT_THRESHOLD) return;
                     }
 
                     lastValidLat = lat;
@@ -437,23 +410,17 @@
                         if (navigator.onLine) {
                             set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lat`), lat);
                             set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/lng`), lng);
-                            
-                            const historyRef = ref(db, `groups/${currentGroupId}/members/${currentUserId}/history`);
-                            push(historyRef, { lat: lat, lng: lng, timestamp: Date.now() });
-                            
+                            push(ref(db, `groups/${currentGroupId}/members/${currentUserId}/history`), { lat: lat, lng: lng, timestamp: Date.now() });
                             flushOfflineBuffer();
                         } else {
                             bufferLocationOffline(lat, lng);
                         }
                     }
-                }, (error) => console.error(error), { 
-                    enableHighAccuracy: true,
-                    maximumAge: 0,
-                    timeout: 10000
-                });
+                }, (error) => console.error(error), { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
             }
         }
 
+        // 4. Real-time Database Cluster Sync Streams
         function listenToGroupRealtimeChanges() {
             if (!currentGroupId) return;
 
@@ -520,7 +487,6 @@
                         } else {
                             mapMarkers[userId] = L.marker([data.lat, data.lng], { icon: targetIcon }).addTo(map);
                         }
-                        mapMarkers[userId].bindPopup(`<div class="text-slate-900 font-sans text-xs"><b>User:</b> ${data.name || 'Unknown'}<br><b>Status:</b> ${data.isEmergency ? '🚨 SOS' : hasBreachedGeofence ? '⚠️ BREACHED' : '🟢 SAFE'}</div>`, { className: 'custom-popup' });
                     }
 
                     if (data.history && map) {
@@ -528,9 +494,7 @@
                         if (mapPolylines[userId]) {
                             mapPolylines[userId].setLatLngs(trailPoints);
                         } else {
-                            mapPolylines[userId] = L.polyline(trailPoints, {
-                                color: userId === currentUserId ? '#2563eb' : '#16a34a', weight: 4, opacity: 0.85
-                            }).addTo(map);
+                            mapPolylines[userId] = L.polyline(trailPoints, { color: userId === currentUserId ? '#2563eb' : '#16a34a', weight: 4, opacity: 0.85 }).addTo(map);
                         }
                     }
                 });
@@ -542,21 +506,10 @@
                 if (groupAlertTriggered) {
                     if (emergencyMsg) emergencyMsg.innerText = compositeAlertMsg;
                     if (emergencyBanner) emergencyBanner.classList.remove('hidden');
-                    
-                    if (siren) {
-                        siren.volume = 1.0; 
-                        siren.addEventListener('ended', function() {
-                            this.currentTime = 0;
-                            this.play().catch(() => {});
-                        }, false);
-                        siren.play().catch((err) => console.log("Autoplay blocked block:", err));
-                    }
+                    playSynthesizedAlarmTone();
                 } else {
                     if (emergencyBanner) emergencyBanner.classList.add('hidden');
-                    if (siren) {
-                        siren.pause();
-                        siren.currentTime = 0;
-                    }
+                    stopSynthesizedAlarmTone();
                 }
             });
         }
@@ -568,6 +521,7 @@
         document.getElementById('btn-logout').addEventListener('click', handleLogoutAndClear);
         document.getElementById('btn-hard-reset').addEventListener('click', handleLogoutAndClear);
 
+        // Web Bluetooth GATT Core Streams
         document.getElementById('btn-ble-connect').addEventListener('click', async () => {
             try {
                 const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'GeoGuard_Button' }], optionalServices: [BLE_SERVICE_UUID] });
@@ -579,7 +533,7 @@
                     const value = event.target.value.getUint8(0);
                     if(currentGroupId) set(ref(db, `groups/${currentGroupId}/members/${currentUserId}/isEmergency`), value === 1);
                 });
-            } catch (error) { console.error(error); }
+            } catch (error) { console.error("Hardware BLE Sync Fault:", error); }
         });
 
         document.getElementById('btn-panic').addEventListener('click', () => {
